@@ -231,7 +231,7 @@ function align(a) {
 }
 function del() { if (!sel.size) return; commit(); for (const id of sel) { const x = get(id); if (x && x.master) for (const c of doc.items.filter((y) => y.inst === id)) detach(c.id); if (x && x.inst) doc.items = doc.items.filter((y) => y.instRoot !== id); } doc.items = doc.items.filter((i) => !sel.has(i.id)); for (const i of doc.items) if (sel.has(i.go)) i.go = ''; sel.clear(); render(); }
 function dupe() { const it = doc.items.filter((i) => sel.has(i.id)); if (!it.length) return; commit(); sel.clear(); for (const i of it) { if (i.instOf) continue; const c = { ...JSON.parse(JSON.stringify(i)), id: uid(), x: i.x + 24, y: i.y + 24, name: i.name + ' copy' }; delete c.master; doc.items.push(c); sel.add(c.id); } render(); }
-function newDoc() { if (doc.items.length && !confirm('Discard the current design?')) return; doc = { title: 'Untitled design', items: [] }; sel.clear(); undoS = []; redoS = []; fileName = ''; render(); fit(); }
+function newDoc() { if (doc.items.length && !confirm('Discard the current design?')) return; doc = { title: 'Untitled design', items: [] }; sel.clear(); undoS = []; savedSnap = snapshot(); redoS = []; fileName = ''; render(); fit(); }
 
 // ---------- pointer ----------
 let drag = null, spaceDown = false;
@@ -350,10 +350,10 @@ function showPreviewFrame(f, how = 'none', noPush = false) {
 const cleanItem = (i) => ({ id: String(i.id || uid()), type: NAMES[i.type] ? i.type : 'rect', name: String(i.name || 'Layer'), x: +i.x || 0, y: +i.y || 0, w: +i.w || 0, h: +i.h || 0, fill: i.fill === 'none' ? 'none' : hex(i.fill, '#d0d0d0'), stroke: hex(i.stroke, '#000000'), sw: Math.max(0, +i.sw || 0), r: Math.max(0, +i.r || 0), op: clamp(+i.op || 1, 0.05, 1), text: String(i.text || ''), fs: clamp(+i.fs || 16, 6, 400), go: String(i.go || ''), tr: ['fade', 'slide'].includes(i.tr) ? i.tr : 'none', master: !!i.master, inst: i.inst ? String(i.inst) : undefined, instOf: i.instOf ? String(i.instOf) : undefined, instRoot: i.instRoot ? String(i.instRoot) : undefined, ov: !!i.ov, al: i.al && ['v', 'h'].includes(i.al.dir) ? { dir: i.al.dir, gap: Math.max(0, +i.al.gap || 0), pad: Math.max(0, +i.al.pad || 0), align: ['center', 'end'].includes(i.al.align) ? i.al.align : 'start', hug: !!i.al.hug } : undefined, hidden: !!i.hidden, locked: !!i.locked });
 async function openDoc(dropped) {
   const f = (dropped && dropped.data) ? dropped : (await window.host.openFiles({ filters: [['Frameout design', ['frameout', 'json']]] }))[0]; if (!f) return;
-  try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); doc = { title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem) }; fileName = f.name; sel.clear(); undoS = []; fit(); }
+  try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); doc = { title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem) }; fileName = f.name; sel.clear(); undoS = []; savedSnap = snapshot(); fit(); }
   catch (e) { toast('Cannot open: ' + e.message); }
 }
-async function saveDoc() { const r = await window.host.saveFile({ name: (doc.title || 'design') + '.frameout', filters: [['Frameout design', ['frameout']]], data: new TextEncoder().encode(JSON.stringify(doc, null, 1)) }); if (r) { fileName = r.name; toast('Saved ' + r.name); renderStatus(); } }
+async function saveDoc() { const r = await window.host.saveFile({ name: (doc.title || 'design') + '.frameout', filters: [['Frameout design', ['frameout']]], data: new TextEncoder().encode(JSON.stringify(doc, null, 1)) }); if (r) { savedSnap = snapshot(); fileName = r.name; toast('Saved ' + r.name); renderStatus(); } }
 function exportTarget() { const f = sel.size === 1 ? get([...sel][0]) : null; if (f && f.type === 'frame') return { f, only: doc.items.filter((i) => i === f || inside(i, f)) }; const all = doc.items.filter((i) => !i.hidden); if (!all.length) return null; const x0 = Math.min(...all.map((i) => i.x)), y0 = Math.min(...all.map((i) => i.y)), x1 = Math.max(...all.map((i) => i.x + i.w)), y1 = Math.max(...all.map((i) => i.y + i.h)); return { f: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, only: all }; }
 function exportSvgString() {
   const t = exportTarget(); if (!t) return null; const { f, only } = t;
@@ -395,3 +395,7 @@ window.addEventListener('drop', async (e) => {
   const f = [...(e.dataTransfer?.files || [])].find((x) => /.(frameout|json)$/i.test(x.name)); if (!f) { toast('Drop a .frameout file to open it'); return; }
   openDoc({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
 });
+
+let savedSnap = null;
+setTimeout(() => { if (savedSnap === null) savedSnap = snapshot(); }, 0);
+window.addEventListener('beforeunload', (e) => { if (savedSnap !== null && snapshot() !== savedSnap) { e.preventDefault(); e.returnValue = ''; } });
