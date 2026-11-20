@@ -348,8 +348,8 @@ function showPreviewFrame(f, how = 'none', noPush = false) {
 
 // ---------- files ----------
 const cleanItem = (i) => ({ id: String(i.id || uid()), type: NAMES[i.type] ? i.type : 'rect', name: String(i.name || 'Layer'), x: +i.x || 0, y: +i.y || 0, w: +i.w || 0, h: +i.h || 0, fill: i.fill === 'none' ? 'none' : hex(i.fill, '#d0d0d0'), stroke: hex(i.stroke, '#000000'), sw: Math.max(0, +i.sw || 0), r: Math.max(0, +i.r || 0), op: clamp(+i.op || 1, 0.05, 1), text: String(i.text || ''), fs: clamp(+i.fs || 16, 6, 400), go: String(i.go || ''), tr: ['fade', 'slide'].includes(i.tr) ? i.tr : 'none', master: !!i.master, inst: i.inst ? String(i.inst) : undefined, instOf: i.instOf ? String(i.instOf) : undefined, instRoot: i.instRoot ? String(i.instRoot) : undefined, ov: !!i.ov, al: i.al && ['v', 'h'].includes(i.al.dir) ? { dir: i.al.dir, gap: Math.max(0, +i.al.gap || 0), pad: Math.max(0, +i.al.pad || 0), align: ['center', 'end'].includes(i.al.align) ? i.al.align : 'start', hug: !!i.al.hug } : undefined, hidden: !!i.hidden, locked: !!i.locked });
-async function openDoc() {
-  const f = (await window.host.openFiles({ filters: [['Frameout design', ['frameout', 'json']]] }))[0]; if (!f) return;
+async function openDoc(dropped) {
+  const f = (dropped && dropped.data) ? dropped : (await window.host.openFiles({ filters: [['Frameout design', ['frameout', 'json']]] }))[0]; if (!f) return;
   try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); doc = { title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem) }; fileName = f.name; sel.clear(); undoS = []; fit(); }
   catch (e) { toast('Cannot open: ' + e.message); }
 }
@@ -389,3 +389,9 @@ async function exportImg(kind) {
 })();
 setTool('select'); render(); setTimeout(fit, 30);
 window.addEventListener('resize', () => applyView());
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  const f = [...(e.dataTransfer?.files || [])].find((x) => /.(frameout|json)$/i.test(x.name)); if (!f) { toast('Drop a .frameout file to open it'); return; }
+  openDoc({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
+});
