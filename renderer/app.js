@@ -30,7 +30,7 @@ const get = (id) => doc.items.find((i) => i.id === id);
 const FILLS = ['#ffffff', '#e4e4e4', '#bdbdbd', '#8a8a8a', '#4a4a4a', '#262626', '#d9e0e6', '#e6e0d2', '#dce6dc', '#e8d9d9'];
 const NAMES = { frame: 'Frame', rect: 'Rectangle', ellipse: 'Ellipse', text: 'Text', line: 'Line' };
 function makeItem(type, x, y, w, hh) {
-  const base = { id: uid(), type, name: NAMES[type] + ' ' + (doc.items.filter((i) => i.type === type).length + 1), x, y, w, h: hh, fill: '#d0d0d0', stroke: '#000000', sw: 0, r: 0, op: 1, text: '', fs: 16, go: '', hidden: false, locked: false };
+  const base = { id: uid(), type, name: NAMES[type] + ' ' + (doc.items.filter((i) => i.type === type).length + 1), x, y, w, h: hh, fill: '#d0d0d0', stroke: '#000000', sw: 0, r: 0, op: 1, text: '', fs: 16, go: '', tr: 'none', hidden: false, locked: false };
   if (type === 'frame') Object.assign(base, { fill: '#ffffff', r: 0 });
   if (type === 'text') Object.assign(base, { text: 'Text', fill: '#1a1a1a', h: 24, w: Math.max(w, 80) });
   if (type === 'line') Object.assign(base, { fill: 'none', stroke: '#8a8a8a', sw: 2 });
@@ -38,6 +38,48 @@ function makeItem(type, x, y, w, hh) {
   return base;
 }
 function inside(i, f) { const cx = i.x + i.w / 2, cy = i.y + i.h / 2; return i !== f && cx >= f.x && cx <= f.x + f.w && cy >= f.y && cy <= f.y + f.h; }
+// ---------- components + auto layout ----------
+const kidsOf = (f) => doc.items.filter((c) => c !== f && !c.hidden && inside(c, f));
+function detach(rootId) { for (const c of doc.items) { if (c.id === rootId) delete c.inst; if (c.instRoot === rootId) { delete c.instOf; delete c.instRoot; delete c.ov; } } }
+const COPY = ['w', 'h', 'fill', 'stroke', 'sw', 'r', 'op', 'fs'];
+function syncInstances() {
+  for (const root of doc.items.filter((i) => i.inst)) {
+    const m = get(root.inst);
+    if (!m || !m.master) { detach(root.id); continue; }
+    for (const k of COPY) root[k] = m[k]; root.al = m.al ? { ...m.al } : undefined; if (!root.ov && m.type === 'text') root.text = m.text;
+    if (m.type !== 'frame') continue;
+    const mk = kidsOf(m).filter((c) => !c.inst && !c.instOf);
+    const old = doc.items.filter((c) => c.instRoot === root.id);
+    const keep = {}; for (const o of old) keep[o.instOf] = o;
+    doc.items = doc.items.filter((c) => c.instRoot !== root.id);
+    for (const mc of mk) {
+      const o = keep[mc.id] || { ...JSON.parse(JSON.stringify(mc)), id: uid(), name: mc.name };
+      for (const k of COPY) o[k] = mc[k]; if (!o.ov) o.text = mc.text; o.type = mc.type; o.name = mc.name;
+      o.x = root.x + (mc.x - m.x); o.y = root.y + (mc.y - m.y); o.instOf = mc.id; o.instRoot = root.id; delete o.master; delete o.inst;
+      doc.items.push(o);
+    }
+  }
+}
+function applyLayouts() {
+  for (const f of doc.items.filter((i) => i.type === 'frame' && i.al && i.al.dir).sort((a, b) => a.w * a.h - b.w * b.h)) {
+    const { dir, gap, pad, align, hug } = f.al; const v = dir === 'v';
+    const ks = kidsOf(f).sort((a, b) => (v ? a.y - b.y : a.x - b.x)); if (!ks.length) continue;
+    let pos = pad, cross = 0;
+    for (const k of ks) { const main = v ? k.h : k.w; const sub = v ? k.w : k.h; cross = Math.max(cross, sub);
+      const dx = (v ? f.x + 0 : f.x + pos) - k.x, dy = (v ? f.y + pos : f.y + 0) - k.y; // main axis
+      if (v) k.y = f.y + pos; else k.x = f.x + pos; pos += main + gap; }
+    const inner = (v ? f.w : f.h) - pad * 2; const box = hug ? cross : inner;
+    for (const k of ks) { const sub = v ? k.w : k.h; const off = align === 'center' ? (box - sub) / 2 : align === 'end' ? box - sub : 0; if (v) k.x = f.x + pad + off; else k.y = f.y + pad + off; }
+    if (hug) { const main = pos - gap + pad; if (v) { f.h = Math.max(20, main); f.w = Math.max(20, cross + pad * 2); } else { f.w = Math.max(20, main); f.h = Math.max(20, cross + pad * 2); } }
+  }
+}
+function makeComponent(i) { if (i.inst || i.instOf) { toast('Already an instance'); return; } commit(); i.master = true; render(); toast('Component created'); }
+function insertInstance(m) {
+  if (!m || !m.master) return; commit();
+  const taken = doc.items.filter((i) => i.inst === m.id).map((i) => i.x + i.w); const x = Math.max(m.x + m.w, ...taken) + 40;
+  const root = { ...JSON.parse(JSON.stringify(m)), id: uid(), x, y: m.y, name: m.name + ' instance', inst: m.id, go: m.go || '' }; delete root.master;
+  doc.items.push(root); syncInstances(); sel = new Set([root.id]); render();
+}
 function framesOf(i) { return doc.items.filter((f) => f.type === 'frame' && inside(i, f)); }
 
 // ---------- shell ----------
@@ -78,7 +120,7 @@ function itemEl(i, forExport = false) {
   if (i.hidden) return g;
   const common = { fill: i.fill, stroke: i.sw > 0 || i.type === 'line' ? i.stroke : 'none', 'stroke-width': i.sw, opacity: i.op };
   if (i.type === 'frame' || i.type === 'rect') {
-    if (i.type === 'frame' && !forExport) { const t = sv('text', { x: i.x, y: i.y - 8, fill: '#9a9a9a', 'font-size': 12 / Math.max(zoom, 0.4), 'font-family': 'Segoe UI,Arial,sans-serif' }); t.textContent = i.name; t.dataset.title = i.id; t.style.cursor = 'pointer'; g.append(t); }
+    if (i.type === 'frame' && !forExport) { const t = sv('text', { x: i.x, y: i.y - 8, fill: '#9a9a9a', 'font-size': 12 / Math.max(zoom, 0.4), 'font-family': 'Segoe UI,Arial,sans-serif' }); t.textContent = (i.master ? '\u25C6 ' : i.inst ? '\u25C7 ' : '') + i.name; t.dataset.title = i.id; t.style.cursor = 'pointer'; g.append(t); }
     g.append(sv('rect', { x: i.x, y: i.y, width: i.w, height: i.h, rx: i.r, ...common }));
   } else if (i.type === 'ellipse') g.append(sv('ellipse', { cx: i.x + i.w / 2, cy: i.y + i.h / 2, rx: i.w / 2, ry: i.h / 2, ...common }));
   else if (i.type === 'line') {
@@ -94,6 +136,7 @@ function itemEl(i, forExport = false) {
   return g;
 }
 function render() {
+  syncInstances(); applyLayouts();
   gItems.textContent = ''; gUI.textContent = '';
   for (const i of doc.items) gItems.append(itemEl(i));
   for (const id of sel) {
@@ -117,13 +160,17 @@ function renderLeft() {
   const list = h('div', { class: 'list' });
   [...doc.items].reverse().forEach((i) => {
     const row = h('div', { class: 'item' + (sel.has(i.id) ? ' sel' : ''), style: 'display:flex;gap:4px;align-items:center;cursor:pointer;padding:3px 6px', onclick: (e) => { if (e.shiftKey) { sel.has(i.id) ? sel.delete(i.id) : sel.add(i.id); } else sel = new Set([i.id]); render(); } },
-      h('span', { class: 'grow', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + (i.hidden ? 'opacity:.45' : ''), text: (i.type === 'frame' ? '# ' : '') + i.name }),
+      h('span', { class: 'grow', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + (i.hidden ? 'opacity:.45' : ''), text: (i.master ? '\u25C6 ' : i.inst || i.instOf ? '\u25C7 ' : '') + (i.type === 'frame' ? '# ' : '') + i.name }),
       h('button', { class: 'btn', style: 'padding:0 5px;font-size:11px', title: 'Show or hide', onclick: (e) => { e.stopPropagation(); commit(); i.hidden = !i.hidden; render(); }, text: i.hidden ? 'Show' : 'Hide' }),
       h('button', { class: 'btn', style: 'padding:0 5px;font-size:11px', title: 'Lock or unlock', onclick: (e) => { e.stopPropagation(); commit(); i.locked = !i.locked; render(); }, text: i.locked ? 'Unlock' : 'Lock' }));
     list.append(row);
   });
   if (!doc.items.length) list.append(h('div', { class: 'muted', style: 'padding:8px', text: 'Draw a frame (F) to start a screen, then add shapes and text.' }));
   left.append(list);
+  const masters = doc.items.filter((m) => m.master);
+  left.append(h('h3', { text: 'Components' }));
+  if (!masters.length) left.append(h('div', { class: 'muted', style: 'padding:4px 8px;font-size:12px', text: 'Select a layer and press Create component.' }));
+  for (const m of masters) left.append(h('div', { class: 'item', style: 'display:flex;gap:4px;align-items:center;padding:3px 6px' }, h('span', { class: 'grow', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: '\u25C6 ' + m.name }), btn('Insert', () => insertInstance(m))));
 }
 function renderRight() {
   right.textContent = '';
@@ -141,16 +188,32 @@ function renderRight() {
   const op = h('input', { type: 'range', min: 5, max: 100, value: Math.round(i.op * 100), oninput: () => { items.forEach((it) => (it.op = op.value / 100)); renderItemsOnly(); } }); op.addEventListener('pointerdown', commit);
   right.append(h('h3', { text: 'Opacity' }), op);
   if (i.type === 'text') {
-    const ta = h('textarea', { rows: 3, style: 'width:100%' }); ta.value = i.text; ta.addEventListener('focus', commit, { once: true }); ta.addEventListener('input', () => { i.text = ta.value; const lines = ta.value.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; i.w = Math.max(40, Math.max(...lines.map((l) => l.length)) * i.fs * 0.55); renderItemsOnly(); });
+    const ta = h('textarea', { rows: 3, style: 'width:100%' }); ta.value = i.text; ta.addEventListener('focus', commit, { once: true }); ta.addEventListener('input', () => { i.text = ta.value; if (i.instOf || i.inst) i.ov = true; const lines = ta.value.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; i.w = Math.max(40, Math.max(...lines.map((l) => l.length)) * i.fs * 0.55); renderItemsOnly(); });
     right.append(h('h3', { text: 'Text' }), ta, num('Font size', 'fs'));
     right.lastChild.querySelector('input').addEventListener('change', () => { const lines = i.text.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; render(); });
   }
   const frames = doc.items.filter((f) => f.type === 'frame' && f !== i);
-  if (frames.length) right.append(h('h3', { text: 'Prototype link' }), h('select', { style: 'width:100%', onchange: (e) => { commit(); items.forEach((it) => (it.go = e.target.value)); render(); } }, h('option', { value: '', text: 'None' }), ...frames.map((f) => h('option', { value: f.id, text: 'Go to ' + f.name, selected: i.go === f.id }))));
+  if (frames.length) right.append(h('h3', { text: 'Prototype link' }), h('select', { style: 'width:100%', onchange: (e) => { commit(); items.forEach((it) => (it.go = e.target.value)); render(); } }, h('option', { value: '', text: 'None' }), ...frames.map((f) => h('option', { value: f.id, text: 'Go to ' + f.name, selected: i.go === f.id }))), h('select', { style: 'width:100%', onchange: (e) => { commit(); items.forEach((it) => (it.tr = e.target.value)); } }, ...[['none', 'Instant'], ['fade', 'Fade'], ['slide', 'Slide in']].map(([v, t]) => h('option', { value: v, text: t, selected: (i.tr || 'none') === v }))));
+  right.append(h('h3', { text: 'Component' }));
+  if (i.master) right.append(h('div', { class: 'muted', style: 'font-size:12px', text: 'Main component. Changes here update every instance.' }), btn('Insert instance', () => insertInstance(i)), btn('Remove component', () => { commit(); for (const c of doc.items.filter((x) => x.inst === i.id)) detach(c.id); delete i.master; render(); }));
+  else if (i.inst) right.append(btn('Go to main', () => { sel = new Set([i.inst]); render(); }), btn('Detach instance', () => { commit(); detach(i.id); render(); }));
+  else if (i.instOf) right.append(h('div', { class: 'muted', style: 'font-size:12px', text: 'Part of an instance. Text can be edited, the rest follows the main component.' }));
+  else right.append(btn('Create component', () => makeComponent(i)));
+  if (i.type === 'frame') {
+    const al = i.al || { dir: '', gap: 12, pad: 16, align: 'start', hug: false };
+    const set = (patch) => { commit(); i.al = { ...al, ...patch }; if (!i.al.dir) delete i.al; render(); };
+    right.append(h('h3', { text: 'Auto layout' }),
+      h('select', { style: 'width:100%', onchange: (e) => set({ dir: e.target.value }) }, ...[['', 'Off'], ['v', 'Vertical stack'], ['h', 'Horizontal stack']].map(([v, t]) => h('option', { value: v, text: t, selected: (al.dir || '') === v }))));
+    if (al.dir) right.append(h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:6px' },
+      h('label', { class: 'field' }, 'Gap', h('input', { type: 'number', value: al.gap, style: 'width:100%', onchange: (e) => set({ gap: Math.max(0, +e.target.value || 0) }) })),
+      h('label', { class: 'field' }, 'Padding', h('input', { type: 'number', value: al.pad, style: 'width:100%', onchange: (e) => set({ pad: Math.max(0, +e.target.value || 0) }) }))),
+      h('select', { style: 'width:100%', onchange: (e) => set({ align: e.target.value }) }, ...[['start', 'Align start'], ['center', 'Align center'], ['end', 'Align end']].map(([v, t]) => h('option', { value: v, text: t, selected: al.align === v }))),
+      h('label', { class: 'field', style: 'flex-direction:row;gap:6px;align-items:center' }, h('input', { type: 'checkbox', checked: !!al.hug, onchange: (e) => set({ hug: e.target.checked }) }), 'Hug contents'));
+  }
   right.append(h('h3', { text: 'Arrange' }), h('div', { class: 'ptools', style: 'display:flex;flex-wrap:wrap;gap:4px' }, btn('Front', () => order('front')), btn('Back', () => order('back')), btn('Forward', () => order('up')), btn('Backward', () => order('down'))));
   if (items.length > 1) right.append(h('h3', { text: 'Align' }), h('div', { style: 'display:flex;flex-wrap:wrap;gap:4px' }, ['Left', 'Center', 'Right', 'Top', 'Middle', 'Bottom'].map((a) => btn(a, () => align(a.toLowerCase())))));
 }
-function renderItemsOnly() { gItems.textContent = ''; for (const i of doc.items) gItems.append(itemEl(i)); }
+function renderItemsOnly() { syncInstances(); applyLayouts(); gItems.textContent = ''; for (const i of doc.items) gItems.append(itemEl(i)); }
 
 // ---------- actions ----------
 function order(how) {
@@ -166,8 +229,8 @@ function align(a) {
   for (const i of it) { if (a === 'left') i.x = x0; else if (a === 'right') i.x = x1 - i.w; else if (a === 'center') i.x = (x0 + x1) / 2 - i.w / 2; else if (a === 'top') i.y = y0; else if (a === 'bottom') i.y = y1 - i.h; else if (a === 'middle') i.y = (y0 + y1) / 2 - i.h / 2; }
   render();
 }
-function del() { if (!sel.size) return; commit(); doc.items = doc.items.filter((i) => !sel.has(i.id)); for (const i of doc.items) if (sel.has(i.go)) i.go = ''; sel.clear(); render(); }
-function dupe() { const it = doc.items.filter((i) => sel.has(i.id)); if (!it.length) return; commit(); sel.clear(); for (const i of it) { const c = { ...JSON.parse(JSON.stringify(i)), id: uid(), x: i.x + 24, y: i.y + 24, name: i.name + ' copy' }; doc.items.push(c); sel.add(c.id); } render(); }
+function del() { if (!sel.size) return; commit(); for (const id of sel) { const x = get(id); if (x && x.master) for (const c of doc.items.filter((y) => y.inst === id)) detach(c.id); if (x && x.inst) doc.items = doc.items.filter((y) => y.instRoot !== id); } doc.items = doc.items.filter((i) => !sel.has(i.id)); for (const i of doc.items) if (sel.has(i.go)) i.go = ''; sel.clear(); render(); }
+function dupe() { const it = doc.items.filter((i) => sel.has(i.id)); if (!it.length) return; commit(); sel.clear(); for (const i of it) { if (i.instOf) continue; const c = { ...JSON.parse(JSON.stringify(i)), id: uid(), x: i.x + 24, y: i.y + 24, name: i.name + ' copy' }; delete c.master; doc.items.push(c); sel.add(c.id); } render(); }
 function newDoc() { if (doc.items.length && !confirm('Discard the current design?')) return; doc = { title: 'Untitled design', items: [] }; sel.clear(); undoS = []; redoS = []; fileName = ''; render(); fit(); }
 
 // ---------- pointer ----------
@@ -235,7 +298,7 @@ svg.addEventListener('pointerup', () => {
 });
 svg.addEventListener('wheel', (ev) => { ev.preventDefault(); const r = svg.getBoundingClientRect(); if (ev.ctrlKey || ev.metaKey) zoomBy(ev.deltaY < 0 ? 1.1 : 1 / 1.1, ev.clientX - r.left, ev.clientY - r.top); else { panX -= ev.deltaX; panY -= ev.deltaY; applyView(); } }, { passive: false });
 document.addEventListener('keydown', (e) => {
-  if (preview) { if (e.key === 'Escape') endPreview(); return; }
+  if (preview) { if (e.key === 'Escape') endPreview(); else if (e.key === 'Backspace' || e.key === 'ArrowLeft') previewBack(); return; }
   if (e.target.matches('input,textarea,select')) return;
   const k = e.key.toLowerCase();
   if (e.code === 'Space') { spaceDown = true; e.preventDefault(); }
@@ -256,26 +319,35 @@ document.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = 
 
 // ---------- prototype preview ----------
 function startPreview() {
-  const frames = doc.items.filter((f) => f.type === 'frame'); if (!frames.length) { toast('Add a frame first'); return; }
+  const frames = doc.items.filter((f) => f.type === 'frame' && !f.hidden); if (!frames.length) { toast('Add a frame first'); return; }
   const start = (sel.size && get([...sel][0])?.type === 'frame' ? get([...sel][0]) : frames[0]);
   const back = h('div', { class: 'modal-back', style: 'background:#141414;flex-direction:column;gap:10px' });
-  preview = { back, frame: start };
-  document.body.append(back); showPreviewFrame(start);
+  preview = { back, frame: start, hist: [], hot: false };
+  document.body.append(back); showPreviewFrame(start, 'none', true);
 }
 function endPreview() { preview?.back.remove(); preview = null; }
-function showPreviewFrame(f) {
+function previewBack() { if (!preview || !preview.hist.length) return; const f = get(preview.hist.pop()); if (f) showPreviewFrame(f, 'fade', true); }
+function showPreviewFrame(f, how = 'none', noPush = false) {
+  if (!noPush && preview.frame && preview.frame !== f) preview.hist.push(preview.frame.id);
   preview.frame = f; const back = preview.back; back.textContent = '';
-  const maxW = window.innerWidth - 60, maxH = window.innerHeight - 90; const sc = Math.min(maxW / f.w, maxH / f.h, 1.5);
+  const maxW = window.innerWidth - 60, maxH = window.innerHeight - 100; const sc = Math.min(maxW / f.w, maxH / f.h, 1.5);
   const s = sv('svg', { width: f.w * sc, height: f.h * sc, viewBox: `${f.x} ${f.y} ${f.w} ${f.h}`, style: 'background:#fff;box-shadow:0 0 0 1px #000' });
   s.append(sv('clipPath', { id: 'pvc' })); s.firstChild.append(sv('rect', { x: f.x, y: f.y, width: f.w, height: f.h }));
   const g = sv('g', { 'clip-path': 'url(#pvc)' }); s.append(g);
   g.append(itemEl({ ...f, name: '' }, true));
-  for (const i of doc.items) { if (i === f || i.type === 'frame' || !inside(i, f) || i.hidden) continue; const el = itemEl(i, true); if (i.go && get(i.go)) { el.style.cursor = 'pointer'; el.addEventListener('click', () => showPreviewFrame(get(i.go))); } g.append(el); }
-  back.append(s, h('div', { class: 'row' }, h('span', { class: 'muted', text: f.name }), btn('Close preview', endPreview)));
+  for (const i of doc.items) {
+    if (i === f || i.type === 'frame' || !inside(i, f) || i.hidden) continue; const el = itemEl(i, true);
+    if (i.go && get(i.go)) { el.style.cursor = 'pointer'; el.addEventListener('click', () => showPreviewFrame(get(i.go), i.tr || 'none')); if (preview.hot) g.append(el), g.append(sv('rect', { x: i.x, y: i.y, width: i.w, height: i.h, fill: 'rgba(120,120,120,.25)', stroke: '#777', 'stroke-dasharray': '4 3', 'pointer-events': 'none' })); else g.append(el); }
+    else g.append(el);
+  }
+  const bar = h('div', { class: 'row' }, btn('Back', previewBack), h('span', { class: 'muted', text: f.name }), btn(preview.hot ? 'Hide hotspots' : 'Show hotspots', () => { preview.hot = !preview.hot; showPreviewFrame(f, 'none', true); }), btn('Restart', () => { preview.hist = []; showPreviewFrame(doc.items.find((x) => x.type === 'frame' && !x.hidden), 'none', true); }), btn('Close preview', endPreview));
+  back.append(s, bar);
+  if (how === 'fade' && s.animate) s.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240 });
+  else if (how === 'slide' && s.animate) s.animate([{ transform: 'translateX(60px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'ease-out' });
 }
 
 // ---------- files ----------
-const cleanItem = (i) => ({ id: String(i.id || uid()), type: NAMES[i.type] ? i.type : 'rect', name: String(i.name || 'Layer'), x: +i.x || 0, y: +i.y || 0, w: +i.w || 0, h: +i.h || 0, fill: i.fill === 'none' ? 'none' : hex(i.fill, '#d0d0d0'), stroke: hex(i.stroke, '#000000'), sw: Math.max(0, +i.sw || 0), r: Math.max(0, +i.r || 0), op: clamp(+i.op || 1, 0.05, 1), text: String(i.text || ''), fs: clamp(+i.fs || 16, 6, 400), go: String(i.go || ''), hidden: !!i.hidden, locked: !!i.locked });
+const cleanItem = (i) => ({ id: String(i.id || uid()), type: NAMES[i.type] ? i.type : 'rect', name: String(i.name || 'Layer'), x: +i.x || 0, y: +i.y || 0, w: +i.w || 0, h: +i.h || 0, fill: i.fill === 'none' ? 'none' : hex(i.fill, '#d0d0d0'), stroke: hex(i.stroke, '#000000'), sw: Math.max(0, +i.sw || 0), r: Math.max(0, +i.r || 0), op: clamp(+i.op || 1, 0.05, 1), text: String(i.text || ''), fs: clamp(+i.fs || 16, 6, 400), go: String(i.go || ''), tr: ['fade', 'slide'].includes(i.tr) ? i.tr : 'none', master: !!i.master, inst: i.inst ? String(i.inst) : undefined, instOf: i.instOf ? String(i.instOf) : undefined, instRoot: i.instRoot ? String(i.instRoot) : undefined, ov: !!i.ov, al: i.al && ['v', 'h'].includes(i.al.dir) ? { dir: i.al.dir, gap: Math.max(0, +i.al.gap || 0), pad: Math.max(0, +i.al.pad || 0), align: ['center', 'end'].includes(i.al.align) ? i.al.align : 'start', hug: !!i.al.hug } : undefined, hidden: !!i.hidden, locked: !!i.locked });
 async function openDoc() {
   const f = (await window.host.openFiles({ filters: [['Frameout design', ['frameout', 'json']]] }))[0]; if (!f) return;
   try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); doc = { title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem) }; fileName = f.name; sel.clear(); undoS = []; fit(); }
