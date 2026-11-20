@@ -1,6 +1,6 @@
 <p align="center"><img src="screenshots/banner.png" alt="Frameout" width="100%"></p>
 
-<p align="center"><b>Screen design and prototypes</b><br>Version 1.0.1 for Windows · Free · Offline · No account</p>
+<p align="center"><b>Screen design and prototypes</b><br>Version 1.0.2 for Windows · Free · Offline · No account</p>
 
 <p align="center"><a href="https://github.com/plawanpawin-byte/frameout/releases/latest"><b>Download Frameout</b></a> · <a href="https://github.com/plawanpawin-byte/Lookout">All Lookout apps</a></p>
 
@@ -11,6 +11,12 @@ Frameout is a canvas for designing app screens and web pages. Draw a frame for e
 **Made for:** Designers, developers and founders who need a quick, private place to sketch interfaces.
 
 ![Frameout](screenshots/01-canvas.png)
+
+**On this page:** [Screenshots](#see-it-in-action) · [Interface](#the-interface) · [Features](#everything-it-can-do) · [How to use it](#how-to-use-it) · [Shortcuts](#keyboard-shortcuts) · [Formats](#files-and-formats) · [Privacy](#private-by-design) · [Install](#install) · [Questions](#questions)
+
+## What is new in 1.0.2
+
+A refreshed interface: every toolbar button now has a clear line icon, the app's mark sits at the top left, controls share one height and spacing, panels line up in tidy grids, and the toolbar keeps every button reachable on smaller windows by switching less important buttons to icons.
 
 ## See it in action
 
@@ -43,6 +49,12 @@ Select a frame and export it as a crisp PNG.
 ![Exported detail screen](screenshots/05-exported-detail-screen.png)
 
 Each frame exports on its own, so one file can hold a whole app.
+
+## The interface
+
+- **Top bar:** file buttons, the drawing tools (Move, Frame, Rectangle, Ellipse, Line, Text), undo, redo, duplicate, delete, zoom, Preview and Export PNG / SVG.
+- **Left panel:** every layer by name, with show/hide and lock buttons.
+- **Right panel:** position, size, name, fill, stroke, corner radius, opacity, prototype link and arrange controls of the selection.
 
 ## Everything it can do
 
@@ -124,5 +136,15 @@ No. Everything runs offline.
 ## About Lookout
 
 Frameout belongs to the **[Lookout](https://github.com/plawanpawin-byte/Lookout)** family: ten small, private Windows apps for documents and media, all with the same calm grey look and the same promise that your files stay yours. Install and update them together with the [Lookout launcher](https://github.com/plawanpawin-byte/lookout-launcher).
+
+- **[Pageout](https://github.com/plawanpawin-byte/pageout)**: read, annotate and sign pdfs
+- **[Chartout](https://github.com/plawanpawin-byte/chartout)**: flowcharts and diagrams
+- **[Branchout](https://github.com/plawanpawin-byte/branchout)**: mind maps and outlines
+- **[Planout](https://github.com/plawanpawin-byte/planout)**: plans and gantt timelines
+- **[Cutout](https://github.com/plawanpawin-byte/cutout)**: video editing on a timeline
+- **[Shiftout](https://github.com/plawanpawin-byte/shiftout)**: convert and compress media
+- **[Castout](https://github.com/plawanpawin-byte/castout)**: record your screen
+- **[Mendout](https://github.com/plawanpawin-byte/mendout)**: repair damaged media
+- **[Tuneout](https://github.com/plawanpawin-byte/tuneout)**: record and edit audio
 
 Released under the MIT License.
