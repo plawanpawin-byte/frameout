@@ -37,9 +37,16 @@ function makeItem(type, x, y, w, hh) {
   if (type === 'rect') Object.assign(base, { r: 6 });
   return base;
 }
-function inside(i, f) { const cx = i.x + i.w / 2, cy = i.y + i.h / 2; return i !== f && cx >= f.x && cx <= f.x + f.w && cy >= f.y && cy <= f.y + f.h; }
+// a frame can only sit inside a bigger frame, so a frame that shrank (hug) never becomes a child of its own child
+function inside(i, f) { if (i === f || (i.type === 'frame' && i.w * i.h >= f.w * f.h)) return false; const cx = i.x + i.w / 2, cy = i.y + i.h / 2; return cx >= f.x && cx <= f.x + f.w && cy >= f.y && cy <= f.y + f.h; }
 // ---------- components + auto layout ----------
-const kidsOf = (f) => doc.items.filter((c) => c !== f && !c.hidden && inside(c, f));
+const kidsOf = (f) => doc.items.filter((c) => c !== f && !c.hidden && inside(c, f));   // everything inside, nested frames' contents too
+const descOf = (f) => doc.items.filter((c) => c !== f && inside(c, f));
+// the frame an item belongs to: the smallest frame that contains it
+const parentFrame = (c) => { let best = null; for (const f of doc.items) if (f.type === 'frame' && f !== c && inside(c, f) && (!best || f.w * f.h < best.w * best.h)) best = f; return best; };
+const directKids = (f) => doc.items.filter((c) => c !== f && !c.hidden && inside(c, f) && parentFrame(c) === f);
+// the item plus, for frames, everything inside (that is what moving, copying and deleting a frame mean)
+function expand(ids) { const out = new Set(ids); for (const id of ids) { const f = get(id); if (f && f.type === 'frame') for (const c of descOf(f)) out.add(c.id); } return out; }
 function detach(rootId) { for (const c of doc.items) { if (c.id === rootId) delete c.inst; if (c.instRoot === rootId) { delete c.instOf; delete c.instRoot; delete c.ov; } } }
 const COPY = ['w', 'h', 'fill', 'stroke', 'sw', 'r', 'op', 'fs'];
 function syncInstances() {
@@ -63,13 +70,15 @@ function syncInstances() {
 function applyLayouts() {
   for (const f of doc.items.filter((i) => i.type === 'frame' && i.al && i.al.dir).sort((a, b) => a.w * a.h - b.w * b.h)) {
     const { dir, gap, pad, align, hug } = f.al; const v = dir === 'v';
-    const ks = kidsOf(f).sort((a, b) => (v ? a.y - b.y : a.x - b.x)); if (!ks.length) continue;
+    const ks = directKids(f).sort((a, b) => (v ? a.y - b.y : a.x - b.x)); if (!ks.length) continue;
+    // work out what travels with each child (a nested frame takes its contents along) before anything moves
+    const plan = ks.map((k) => ({ k, d: k.type === 'frame' ? descOf(k) : [] }));
+    const put = (e, nx, ny) => { const dx = nx - e.k.x, dy = ny - e.k.y; if (!dx && !dy) return; for (const c of e.d) { c.x += dx; c.y += dy; } e.k.x = nx; e.k.y = ny; };
     let pos = pad, cross = 0;
-    for (const k of ks) { const main = v ? k.h : k.w; const sub = v ? k.w : k.h; cross = Math.max(cross, sub);
-      const dx = (v ? f.x + 0 : f.x + pos) - k.x, dy = (v ? f.y + pos : f.y + 0) - k.y; // main axis
-      if (v) k.y = f.y + pos; else k.x = f.x + pos; pos += main + gap; }
+    for (const e of plan) { const k = e.k; const main = v ? k.h : k.w; const sub = v ? k.w : k.h; cross = Math.max(cross, sub);
+      if (v) put(e, k.x, f.y + pos); else put(e, f.x + pos, k.y); pos += main + gap; }
     const inner = (v ? f.w : f.h) - pad * 2; const box = hug ? cross : inner;
-    for (const k of ks) { const sub = v ? k.w : k.h; const off = align === 'center' ? (box - sub) / 2 : align === 'end' ? box - sub : 0; if (v) k.x = f.x + pad + off; else k.y = f.y + pad + off; }
+    for (const e of plan) { const k = e.k; const sub = v ? k.w : k.h; const off = align === 'center' ? (box - sub) / 2 : align === 'end' ? box - sub : 0; if (v) put(e, f.x + pad + off, k.y); else put(e, k.x, f.y + pad + off); }
     if (hug) { const main = pos - gap + pad; if (v) { f.h = Math.max(20, main); f.w = Math.max(20, cross + pad * 2); } else { f.w = Math.max(20, main); f.h = Math.max(20, cross + pad * 2); } }
   }
 }
@@ -177,9 +186,10 @@ function renderRight() {
   right.append(h('h3', { text: 'Design' }), h('label', { class: 'field' }, 'Title', h('input', { type: 'text', value: doc.title, oninput: (e) => { doc.title = e.target.value; } })));
   const items = [...sel].map(get).filter(Boolean); if (!items.length) { right.append(h('h3', { text: 'Tips' }), h('div', { class: 'muted', style: 'font-size:12px;line-height:1.6;white-space:pre-line', text: 'Pick a tool or press its letter, then drag on the canvas.\nShift-click to select several.\nScroll to pan, Ctrl+scroll to zoom, hold Space to pan.\nGive a shape a Link to a frame, then press Preview to click through your prototype.' })); return; }
   const i = items[0];
-  const num = (label, key) => h('label', { class: 'field' }, label, h('input', { type: 'number', value: Math.round(i[key] * 10) / 10, style: 'width:100%', onfocus: commit, onchange: (e) => { const v = +e.target.value; if (!isNaN(v)) { items.forEach((it) => { if (['w', 'h'].includes(key)) it[key] = Math.max(1, v); else it[key] = v; }); render(); } } }));
+  let nameUndo = false;
+  const num = (label, key) => h('label', { class: 'field' }, label, h('input', { type: 'number', value: Math.round(i[key] * 10) / 10, style: 'width:100%', onchange: (e) => { const v = +e.target.value; if (!isNaN(v)) { commit(); items.forEach((it) => { if (['w', 'h'].includes(key)) it[key] = Math.max(1, v); else it[key] = v; }); render(); } } }));
   right.append(h('h3', { text: 'Layout' }), h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:6px' }, num('X', 'x'), num('Y', 'y'), num('W', 'w'), num('H', 'h')));
-  right.append(h('label', { class: 'field' }, 'Name', h('input', { type: 'text', value: i.name, onfocus: commit, oninput: (e) => { i.name = e.target.value; renderLeft(); } })));
+  right.append(h('label', { class: 'field' }, 'Name', h('input', { type: 'text', value: i.name, oninput: (e) => { if (!nameUndo) { commit(); nameUndo = true; } i.name = e.target.value; renderLeft(); } })));
   if (i.type !== 'line') {
     right.append(h('h3', { text: i.type === 'text' ? 'Text color' : 'Fill' }), h('div', { class: 'swatches' }, FILLS.map((c) => h('button', { style: `background:${c}`, onclick: () => { commit(); items.forEach((it) => { it.fill = c; }); render(); } }))));
   }
@@ -188,7 +198,7 @@ function renderRight() {
   const op = h('input', { type: 'range', min: 5, max: 100, value: Math.round(i.op * 100), oninput: () => { items.forEach((it) => (it.op = op.value / 100)); renderItemsOnly(); } }); op.addEventListener('pointerdown', commit);
   right.append(h('h3', { text: 'Opacity' }), op);
   if (i.type === 'text') {
-    const ta = h('textarea', { rows: 3, style: 'width:100%' }); ta.value = i.text; ta.addEventListener('focus', commit, { once: true }); ta.addEventListener('input', () => { i.text = ta.value; if (i.instOf || i.inst) i.ov = true; const lines = ta.value.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; i.w = Math.max(40, Math.max(...lines.map((l) => l.length)) * i.fs * 0.55); renderItemsOnly(); });
+    const ta = h('textarea', { rows: 3, style: 'width:100%' }); ta.value = i.text; ta.addEventListener('input', commit, { once: true }); ta.addEventListener('input', () => { i.text = ta.value; if (i.instOf || i.inst) i.ov = true; const lines = ta.value.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; i.w = Math.max(40, Math.max(...lines.map((l) => l.length)) * i.fs * 0.55); renderItemsOnly(); });
     right.append(h('h3', { text: 'Text' }), ta, num('Font size', 'fs'));
     right.lastChild.querySelector('input').addEventListener('change', () => { const lines = i.text.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; render(); });
   }
@@ -229,8 +239,27 @@ function align(a) {
   for (const i of it) { if (a === 'left') i.x = x0; else if (a === 'right') i.x = x1 - i.w; else if (a === 'center') i.x = (x0 + x1) / 2 - i.w / 2; else if (a === 'top') i.y = y0; else if (a === 'bottom') i.y = y1 - i.h; else if (a === 'middle') i.y = (y0 + y1) / 2 - i.h / 2; }
   render();
 }
-function del() { if (!sel.size) return; commit(); for (const id of sel) { const x = get(id); if (x && x.master) for (const c of doc.items.filter((y) => y.inst === id)) detach(c.id); if (x && x.inst) doc.items = doc.items.filter((y) => y.instRoot !== id); } doc.items = doc.items.filter((i) => !sel.has(i.id)); for (const i of doc.items) if (sel.has(i.go)) i.go = ''; sel.clear(); render(); }
-function dupe() { const it = doc.items.filter((i) => sel.has(i.id)); if (!it.length) return; commit(); sel.clear(); for (const i of it) { if (i.instOf) continue; const c = { ...JSON.parse(JSON.stringify(i)), id: uid(), x: i.x + 24, y: i.y + 24, name: i.name + ' copy' }; delete c.master; doc.items.push(c); sel.add(c.id); } render(); }
+function del() {
+  if (!sel.size) return; commit(); const ids = expand(sel);
+  for (const id of ids) { const x = get(id); if (x && x.master) for (const c of doc.items.filter((y) => y.inst === id)) detach(c.id); if (x && x.inst) doc.items = doc.items.filter((y) => y.instRoot !== id); }
+  doc.items = doc.items.filter((i) => !ids.has(i.id)); for (const i of doc.items) if (ids.has(i.go)) i.go = ''; sel.clear(); render();
+}
+// copies of the chosen items and, for frames, everything inside them; returns the new ids of the chosen ones
+function cloneSet(chosen, dx, dy) {
+  const all = expand(chosen), map = new Map(), out = [];
+  for (const i of doc.items) { if (!all.has(i.id) || i.instOf) continue; const c = JSON.parse(JSON.stringify(i)); c.id = uid(); c.x += dx; c.y += dy; delete c.master; if (chosen.has(i.id)) c.name = i.name + ' copy'; map.set(i.id, c); out.push(c); }
+  for (const c of out) if (map.has(c.go)) c.go = map.get(c.go).id;   // links between copied screens follow the copies
+  return { out, roots: [...chosen].filter((id) => map.has(id)).map((id) => map.get(id).id) };
+}
+// where copies go: shapes nudge down-right, screens (frames) go in the free space to the right of the originals
+function copyOffset(rootIds) {
+  const roots = [...rootIds].map(get).filter(Boolean), fr = roots.filter((r) => r.type === 'frame'); if (!fr.length) return [24, 24];
+  const x0 = Math.min(...fr.map((f) => f.x)), x1 = Math.max(...fr.map((f) => f.x + f.w)), step = x1 - x0 + 40; let dx = step;
+  const others = doc.items.filter((f) => f.type === 'frame');
+  for (let n = 0; n < 50 && fr.some((f) => others.some((o) => o !== f && !rootIds.has(o.id) && Math.abs(o.x - (f.x + dx)) < 2 && Math.abs(o.y - f.y) < 2)); n++) dx += step;
+  return [dx, 0];
+}
+function dupe() { if (!sel.size) return; commit(); const [ox, oy] = copyOffset(sel); const r = cloneSet(new Set(sel), ox, oy); doc.items.push(...r.out); sel = new Set(r.roots); render(); }
 function newDoc() { if (doc.items.length && !confirm('Discard the current design?')) return; doc = { title: 'Untitled design', items: [] }; sel.clear(); undoS = []; savedSnap = snapshot(); redoS = []; fileName = ''; render(); fit(); }
 
 // ---------- pointer ----------
@@ -309,8 +338,8 @@ document.addEventListener('keydown', (e) => {
   else if (e.ctrlKey && k === 's') { e.preventDefault(); saveDoc(); }
   else if (e.ctrlKey && k === 'o') { e.preventDefault(); openDoc(); }
   else if (e.ctrlKey && k === 'a') { e.preventDefault(); sel = new Set(doc.items.map((i) => i.id)); render(); }
-  else if (e.ctrlKey && k === 'c') { const it = doc.items.filter((i) => sel.has(i.id)); if (it.length) { clip = JSON.stringify(it); toast('Copied'); } }
-  else if (e.ctrlKey && k === 'v') { if (!clip) return; commit(); sel.clear(); for (const i of JSON.parse(clip)) { i.id = uid(); i.x += 24; i.y += 24; doc.items.push(i); sel.add(i.id); } render(); }
+  else if (e.ctrlKey && k === 'c') { if (sel.size) { const ex = expand(sel); clip = JSON.stringify({ items: doc.items.filter((i) => ex.has(i.id) && !i.instOf), roots: [...sel], off: copyOffset(sel) }); toast('Copied'); } }
+  else if (e.ctrlKey && k === 'v') { if (!clip) return; commit(); const c = JSON.parse(clip), map = new Map(); sel.clear(); for (const i of c.items) { const o = i.id; i.id = uid(); i.x += (c.off || [24, 24])[0]; i.y += (c.off || [24, 24])[1]; delete i.master; map.set(o, i); } for (const i of map.values()) { if (map.has(i.go)) i.go = map.get(i.go).id; doc.items.push(i); } for (const r of c.roots) if (map.has(r)) sel.add(map.get(r).id); render(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') del();
   else if (e.key === 'Escape') { sel.clear(); setTool('select'); render(); }
   else if (e.key.startsWith('Arrow') && sel.size) { e.preventDefault(); const d = e.shiftKey ? 10 : 1; commit(); doc.items.filter((i) => sel.has(i.id)).forEach((i) => { if (e.key === 'ArrowLeft') i.x -= d; if (e.key === 'ArrowRight') i.x += d; if (e.key === 'ArrowUp') i.y -= d; if (e.key === 'ArrowDown') i.y += d; }); render(); }
@@ -393,7 +422,7 @@ window.addEventListener('resize', () => applyView());
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', async (e) => {
   e.preventDefault();
-  const f = [...(e.dataTransfer?.files || [])].find((x) => /.(frameout|json)$/i.test(x.name)); if (!f) { toast('Drop a .frameout file to open it'); return; }
+  const f = [...(e.dataTransfer?.files || [])].find((x) => /\.(frameout|json)$/i.test(x.name)); if (!f) { toast('Drop a .frameout file to open it'); return; }
   openDoc({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
 });
 
