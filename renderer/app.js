@@ -238,6 +238,7 @@ function renderRight() {
   if (i.type === 'text') {
     const ta = h('textarea', { rows: 3, style: 'width:100%' }); ta.value = i.text; ta.addEventListener('input', commit, { once: true }); ta.addEventListener('input', () => { i.text = ta.value; if (i.instOf || i.inst) i.ov = true; const lines = ta.value.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; i.w = Math.max(40, Math.max(...lines.map((l) => l.length)) * i.fs * 0.55); renderItemsOnly(); });
     right.append(h('h3', { text: 'Text' }), ta, num('Font size', 'fs'));
+    if (focusText) { focusText = false; setTimeout(() => { const t = right.querySelector('textarea'); if (t) { t.focus(); t.select(); } }, 80); }
     right.lastChild.querySelector('input').addEventListener('change', () => { const lines = i.text.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; render(); });
   }
   const frames = doc.items.filter((f) => f.type === 'frame' && f !== i);
@@ -301,7 +302,8 @@ function dupe() { if (!sel.size) return; commit(); const [ox, oy] = copyOffset(s
 function newDoc() { showSizePicker(); }
 
 // ---------- pointer ----------
-let drag = null, spaceDown = false;
+let drag = null, spaceDown = false, focusText = false;
+svg.addEventListener('mousedown', (ev) => { if (ev.detail !== 2) return; const t = sel.size === 1 ? doc.items.find((x) => sel.has(x.id)) : null; if (t && t.type === 'text') { focusText = true; render(); } });
 svg.addEventListener('pointerdown', (ev) => {
   svg.setPointerCapture(ev.pointerId);
   if (ev.button === 1 || spaceDown || tool === 'hand') { drag = { mode: 'pan', sx: ev.clientX, sy: ev.clientY, px: panX, py: panY }; return; }
@@ -356,7 +358,7 @@ svg.addEventListener('pointerup', () => {
   if (!drag) return; const d = drag; drag = null;
   if (d.mode === 'draw') {
     const i = d.i;
-    if (d.tool === 'text') { i.w = 80; i.h = 24; }
+    if (d.tool === 'text') { i.w = 80; i.h = 24; focusText = true; }
     else if ((d.tool !== 'line' && (i.w < 4 || i.h < 4)) || (d.tool === 'line' && Math.abs(i.w) + Math.abs(i.h) < 4)) { if (d.tool === 'line') { i.w = 120; i.h = 0; } else { i.w = d.tool === 'frame' ? 375 : 120; i.h = d.tool === 'frame' ? 667 : 80; } }
     setTool('select'); render();
   } else if (d.mode === 'move' && !d.moved) { undoS.pop(); render(); }

@@ -65,6 +65,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.23:** after you place a text layer you can type straight away, and double-click a text layer to edit it, instead of hunting for the Text box in the right panel.
+
 **1.0.22:** the bottom bar is smaller and holds more: a Hand tool (H) to pan, Undo, Redo, Duplicate, Delete, Create component, Zoom out, Zoom in, Fit and Preview, next to the drawing tools.
 
 **1.0.21:** the tool bar at the bottom is wider and lower, so it covers less of your design.
