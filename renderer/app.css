@@ -43,3 +43,5 @@
 .hcard .thumb.plus svg{color:var(--accent)}
 .tile .minibox svg{color:var(--text-2)}
 .hbar{color:var(--text-2)}
+.tbtitle{width:200px;height:30px;padding:0 12px;border-radius:15px;border:1px solid transparent;background:var(--bg-3);color:var(--text);font:inherit;font-size:13px;text-align:center}
+.tbtitle:focus{border-color:var(--accent);outline:0}

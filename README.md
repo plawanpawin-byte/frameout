@@ -65,6 +65,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.19:** you can name a design: a Name box in the New design window, and a name box at the top right of the editor to rename it any time. The name shows on its Recent card and is used as the file name when you save or export.
+
 **1.0.18:** cleaner line icons in the left bar and on the Start cards, and the New design window now also lists the templates.
 
 **1.0.17:** the left bar can be closed to icons only (the ☰ button) and opens again the same way; Frameout remembers your choice.

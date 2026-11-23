@@ -113,10 +113,11 @@ app.append(toolbar, h('div', { class: 'main', style: 'flex:1;min-height:0;min-wi
 const btn = (label, fn, cls = '') => h('button', { class: 'btn ' + cls, onclick: fn, text: label });
 const toolBtns = {};
 const TOOLS = [['select', 'Move'], ['frame', 'Frame'], ['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['line', 'Line'], ['text', 'Text']];
+const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', oninput: (e) => { doc.title = e.target.value; }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); } });
 toolbar.append(btn('Home', () => showHome('home')), btn('New', newDoc), btn('Open', openDoc), btn('Save', saveDoc, 'primary'), h('span', { class: 'sep' }));
 TOOLS.forEach(([k, label]) => { const b = btn(label, () => setTool(k)); toolBtns[k] = b; toolbar.append(b); });
 toolbar.append(h('span', { class: 'sep' }), btn('Undo', undo), btn('Redo', redo), btn('Duplicate', dupe), btn('Delete', del), h('span', { class: 'sep' }),
-  btn('-', () => zoomBy(1 / 1.2), 'icon'), btn('+', () => zoomBy(1.2), 'icon'), btn('Fit', fit), h('span', { class: 'grow' }),
+  btn('-', () => zoomBy(1 / 1.2), 'icon'), btn('+', () => zoomBy(1.2), 'icon'), btn('Fit', fit), h('span', { class: 'grow' }), titleInput,
   btn('Preview', startPreview), btn('Export PNG', () => exportImg('png')), btn('Export SVG', () => exportImg('svg')));
 function setTool(t) { tool = t; for (const k in toolBtns) toolBtns[k].classList.toggle('on', k === t); svg.style.cursor = t === 'select' ? 'default' : 'crosshair'; }
 
@@ -156,6 +157,7 @@ function itemEl(i, forExport = false) {
   return g;
 }
 function render() {
+  if (document.activeElement !== titleInput) titleInput.value = doc.title || '';
   syncInstances(); applyLayouts();
   gItems.textContent = ''; gUI.textContent = '';
   for (const i of doc.items) gItems.append(itemEl(i));
@@ -529,6 +531,7 @@ const SIZES = [
 function showSizePicker() {
   let pick = SIZES[0][1][0];
   const W = h('input', { type: 'number', min: 16, max: 10000, value: pick[1], style: 'width:90px' }), H = h('input', { type: 'number', min: 16, max: 10000, value: pick[2], style: 'width:90px' });
+  const nameIn = h('input', { type: 'text', maxlength: 80, value: 'Untitled design', style: 'flex:1;min-width:0', 'aria-label': 'Design name' });
   const tiles = [];
   const mark = () => tiles.forEach(([b, t]) => b.classList.toggle('on', t === pick));
   const groups = SIZES.map(([g, list]) => h('div', {}, h('h3', { text: g }), h('div', { class: 'tiles' }, list.map((t) => {
@@ -538,17 +541,17 @@ function showSizePicker() {
   mark();
   const back = h('div', { class: 'modal-back' });
   const close = () => back.remove();
-  groups.push(h('div', {}, h('h3', { text: 'Or start from a template' }), h('div', { class: 'tiles' }, TEMPLATES.map(([name, sub, make]) => h('button', { class: 'tile', onclick: () => { close(); startDesign(make()); } }, h('span', { class: 'minibox' }, icon('templates', 24)), h('span', { class: 'tn', text: name }), h('span', { class: 'td', text: sub.split(' ').slice(0, 3).join(' ') }))))));
+  groups.push(h('div', {}, h('h3', { text: 'Or start from a template' }), h('div', { class: 'tiles' }, TEMPLATES.map(([name, sub, make]) => h('button', { class: 'tile', onclick: () => { close(); const d = make(); const n = nameIn.value.trim(); if (n && n !== 'Untitled design') d.title = n; startDesign(d); } }, h('span', { class: 'minibox' }, icon('templates', 24)), h('span', { class: 'tn', text: name }), h('span', { class: 'td', text: sub.split(' ').slice(0, 3).join(' ') }))))));
   const create = () => {
     let w = Math.round(+W.value), hh = Math.round(+H.value); const blank = !pick[1];
     if (!blank && (!(w >= 16 && w <= 10000) || !(hh >= 16 && hh <= 10000))) { toast('Use a width and height between 16 and 10000'); return; }
-    close(); const d = { id: uid(), title: 'Untitled design', items: [] };
+    close(); const d = { id: uid(), title: nameIn.value.trim() || 'Untitled design', items: [] };
     const keep = doc; doc = d;
     if (!blank) { const f = makeItem('frame', 0, 0, w, hh); f.name = pick[0] === 'Custom' ? 'Frame' : pick[0]; d.items.push(f); }
     doc = keep; startDesign(d); if (d.items.length) { sel = new Set([d.items[0].id]); render(); }
   };
   [W, H].forEach((el) => el.addEventListener('input', () => { pick = ['Custom', 0, 0]; pick[1] = 1; tiles.forEach(([b]) => b.classList.remove('on')); }));
-  const m = h('div', { class: 'modal', style: 'width:660px;max-width:92vw;overflow:hidden' }, h('h2', { text: 'New design' }), h('div', { class: 'muted', text: 'Choose a size for your first frame. You can add more frames of any size later.' }), h('div', { style: 'overflow:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:6px;padding-right:6px' }, ...groups),
+  const m = h('div', { class: 'modal', style: 'width:660px;max-width:92vw;overflow:hidden' }, h('h2', { text: 'New design' }), h('label', { class: 'row', style: 'display:flex;gap:10px;align-items:center' }, h('span', { text: 'Name' }), nameIn), h('div', { class: 'muted', text: 'Choose a size for your first frame. You can add more frames of any size later.' }), h('div', { style: 'overflow:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:6px;padding-right:6px' }, ...groups),
     h('div', { class: 'row', style: 'gap:8px;align-items:center;display:flex' }, h('span', { text: 'Custom size' }), W, h('span', { text: '\u00D7' }), H, h('span', { class: 'grow' }), btn('Cancel', close), btn('Create', create, 'primary')));
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); }); back.append(m); document.body.append(back);
 }
