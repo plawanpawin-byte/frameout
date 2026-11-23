@@ -19,7 +19,7 @@ const hex = (s, d) => (/^#[0-9a-f]{6}$/i.test(s) ? s : d);
 
 // ---------- model ----------
 // item: {id,type:'frame'|'rect'|'ellipse'|'text'|'line', name,x,y,w,h,fill,stroke,sw,r,op,text,fs,go,hidden,locked}
-let doc = { title: 'Untitled design', items: [] };
+let doc = { id: uid(), title: 'Untitled design', items: [] };
 let sel = new Set(), tool = 'select', zoom = 1, panX = 0, panY = 0, fileName = '';
 let undoS = [], redoS = [], clip = null, preview = null;
 const snapshot = () => JSON.stringify(doc);
@@ -102,7 +102,7 @@ app.append(toolbar, h('div', { class: 'main', style: 'flex:1;min-height:0;min-wi
 const btn = (label, fn, cls = '') => h('button', { class: 'btn ' + cls, onclick: fn, text: label });
 const toolBtns = {};
 const TOOLS = [['select', 'Move'], ['frame', 'Frame'], ['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['line', 'Line'], ['text', 'Text']];
-toolbar.append(btn('New', newDoc), btn('Open', openDoc), btn('Save', saveDoc, 'primary'), h('span', { class: 'sep' }));
+toolbar.append(btn('Home', () => showHome()), btn('New', newDoc), btn('Open', openDoc), btn('Save', saveDoc, 'primary'), h('span', { class: 'sep' }));
 TOOLS.forEach(([k, label]) => { const b = btn(label, () => setTool(k)); toolBtns[k] = b; toolbar.append(b); });
 toolbar.append(h('span', { class: 'sep' }), btn('Undo', undo), btn('Redo', redo), btn('Duplicate', dupe), btn('Delete', del), h('span', { class: 'sep' }),
   btn('-', () => zoomBy(1 / 1.2), 'icon'), btn('+', () => zoomBy(1.2), 'icon'), btn('Fit', fit), h('span', { class: 'grow' }),
@@ -260,7 +260,7 @@ function copyOffset(rootIds) {
   return [dx, 0];
 }
 function dupe() { if (!sel.size) return; commit(); const [ox, oy] = copyOffset(sel); const r = cloneSet(new Set(sel), ox, oy); doc.items.push(...r.out); sel = new Set(r.roots); render(); }
-function newDoc() { if (doc.items.length && !confirm('Discard the current design?')) return; doc = { title: 'Untitled design', items: [] }; sel.clear(); undoS = []; savedSnap = snapshot(); redoS = []; fileName = ''; render(); fit(); }
+function newDoc() { showSizePicker(); }
 
 // ---------- pointer ----------
 let drag = null, spaceDown = false;
@@ -327,6 +327,7 @@ svg.addEventListener('pointerup', () => {
 });
 svg.addEventListener('wheel', (ev) => { ev.preventDefault(); const r = svg.getBoundingClientRect(); if (ev.ctrlKey || ev.metaKey) zoomBy(ev.deltaY < 0 ? 1.1 : 1 / 1.1, ev.clientX - r.left, ev.clientY - r.top); else { panX -= ev.deltaX; panY -= ev.deltaY; applyView(); } }, { passive: false });
 document.addEventListener('keydown', (e) => {
+  if (homeOpen) { if (e.key === 'Escape' && session && !document.querySelector('.modal-back')) closeHome(); return; }
   if (preview) { if (e.key === 'Escape') endPreview(); else if (e.key === 'Backspace' || e.key === 'ArrowLeft') previewBack(); return; }
   if (e.target.matches('input,textarea,select')) return;
   if (document.querySelector('.modal-back') || (!e.ctrlKey && !e.metaKey && e.target.matches('button,[contenteditable]'))) return;
@@ -380,13 +381,13 @@ function showPreviewFrame(f, how = 'none', noPush = false) {
 const cleanItem = (i) => ({ id: String(i.id || uid()), type: NAMES[i.type] ? i.type : 'rect', name: String(i.name || 'Layer'), x: +i.x || 0, y: +i.y || 0, w: +i.w || 0, h: +i.h || 0, fill: i.fill === 'none' ? 'none' : hex(i.fill, '#d0d0d0'), stroke: hex(i.stroke, '#000000'), sw: Math.max(0, +i.sw || 0), r: Math.max(0, +i.r || 0), op: clamp(+i.op || 1, 0.05, 1), text: String(i.text || ''), fs: clamp(+i.fs || 16, 6, 400), go: String(i.go || ''), tr: ['fade', 'slide'].includes(i.tr) ? i.tr : 'none', master: !!i.master, inst: i.inst ? String(i.inst) : undefined, instOf: i.instOf ? String(i.instOf) : undefined, instRoot: i.instRoot ? String(i.instRoot) : undefined, ov: !!i.ov, al: i.al && ['v', 'h'].includes(i.al.dir) ? { dir: i.al.dir, gap: Math.max(0, +i.al.gap || 0), pad: Math.max(0, +i.al.pad || 0), align: ['center', 'end'].includes(i.al.align) ? i.al.align : 'start', hug: !!i.al.hug } : undefined, hidden: !!i.hidden, locked: !!i.locked });
 async function openDoc(dropped) {
   const f = (dropped && dropped.data) ? dropped : (await window.host.openFiles({ filters: [['Frameout design', ['frameout', 'json']]] }))[0]; if (!f) return;
-  try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); doc = { title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem) }; fileName = f.name; sel.clear(); undoS = []; savedSnap = snapshot(); fit(); }
+  try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); autosave(); doc = { id: String(d.id || uid()).slice(0, 24), title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem) }; fileName = f.name; sel.clear(); undoS = []; savedSnap = snapshot(); session = true; closeHome(); fit(); }
   catch (e) { toast('Cannot open: ' + e.message); }
 }
 async function saveDoc() { const r = await window.host.saveFile({ name: (doc.title || 'design') + '.frameout', filters: [['Frameout design', ['frameout']]], data: new TextEncoder().encode(JSON.stringify(doc, null, 1)) }); if (r) { savedSnap = snapshot(); fileName = r.name; toast('Saved ' + r.name); renderStatus(); } }
-function exportTarget() { const f = sel.size === 1 ? get([...sel][0]) : null; if (f && f.type === 'frame') return { f, only: doc.items.filter((i) => i === f || inside(i, f)) }; const all = doc.items.filter((i) => !i.hidden); if (!all.length) return null; const x0 = Math.min(...all.map((i) => i.x)), y0 = Math.min(...all.map((i) => i.y)), x1 = Math.max(...all.map((i) => i.x + i.w)), y1 = Math.max(...all.map((i) => i.y + i.h)); return { f: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, only: all }; }
-function exportSvgString() {
-  const t = exportTarget(); if (!t) return null; const { f, only } = t;
+function exportTarget(forced) { const f = forced || (sel.size === 1 ? get([...sel][0]) : null); if (f && f.type === 'frame') return { f, only: doc.items.filter((i) => i === f || inside(i, f)) }; const all = doc.items.filter((i) => !i.hidden); if (!all.length) return null; const x0 = Math.min(...all.map((i) => i.x)), y0 = Math.min(...all.map((i) => i.y)), x1 = Math.max(...all.map((i) => i.x + i.w)), y1 = Math.max(...all.map((i) => i.y + i.h)); return { f: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, only: all }; }
+function exportSvgString(forced) {
+  const t = exportTarget(forced); if (!t) return null; const { f, only } = t;
   const root = sv('svg', { xmlns: NS, width: f.w, height: f.h, viewBox: `${f.x} ${f.y} ${f.w} ${f.h}` });
   const clip = sv('clipPath', { id: 'ec' }); clip.append(sv('rect', { x: f.x, y: f.y, width: f.w, height: f.h })); root.append(clip);
   root.append(sv('rect', { x: f.x, y: f.y, width: f.w, height: f.h, fill: only.some((i) => i.type === 'frame') ? '#ffffff' : '#ffffff' }));
@@ -403,7 +404,8 @@ async function exportImg(kind) {
 }
 
 // sample: two linked screens
-(function sample() {
+function sampleDoc() {
+  const keep = doc; doc = { id: uid(), title: 'Mobile app', items: [] };
   const f1 = makeItem('frame', 0, 0, 375, 667); f1.name = 'Home';
   const f2 = makeItem('frame', 475, 0, 375, 667); f2.name = 'Details'; f2.fill = '#e4e4e4';
   const t1 = makeItem('text', 28, 56, 200, 40); t1.text = 'Good morning'; t1.fs = 28; t1.fill = '#1a1a1a'; t1.h = 36; t1.w = 220;
@@ -416,8 +418,85 @@ async function exportImg(kind) {
   const b2 = makeItem('rect', 503, 560, 319, 52); b2.fill = '#262626'; b2.r = 26; b2.go = f1.id;
   const bt2 = makeItem('text', 640, 574, 60, 24); bt2.text = 'Back'; bt2.fs = 16; bt2.fill = '#ffffff'; bt2.w = 50; bt2.h = 24;
   doc.items = [f1, f2, t1, c1, ct, b1, bt, t2, e2, b2, bt2]; doc.title = 'Mobile app'; doc.items.forEach((i, k) => { if (i.type === 'text') i.name = i.text; else if (i.type === 'rect') i.name = i.go ? 'Button' : 'Card'; });
-})();
-setTool('select'); render(); setTimeout(fit, 30);
+  const out = doc; doc = keep; return out;
+}
+// ---------- home screen ----------
+const RECENT_KEY = 'frameout.recent';
+let homeOpen = false, session = false, lastSaved = '';
+const home = h('div', { class: 'home' }); app.append(home);
+const readRecent = () => { try { const r = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); return Array.isArray(r) ? r.filter((e) => e && e.id && typeof e.doc === 'string') : []; } catch (e) { return []; } };
+function writeRecent(list) { for (;;) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); return; } catch (e) { if (list.length <= 1) return; list = list.slice(0, -1); } } }
+// keeps the open design in the Recent list (like Figma drafts), with a small picture of its first screen
+function autosave() {
+  if (!session || !doc.items.length) return;
+  if (!doc.id) doc.id = uid();
+  const s = snapshot(); if (s === lastSaved) return; lastSaved = s;
+  let svgStr = ''; try { const fr = doc.items.find((i) => i.type === 'frame' && !i.hidden); const r = exportSvgString(fr || null); svgStr = r ? r.str : ''; } catch (e) { /* no picture */ }
+  const list = readRecent().filter((e) => e.id !== doc.id);
+  list.unshift({ id: doc.id, title: doc.title || 'Untitled design', time: Date.now(), svg: svgStr, doc: s });
+  writeRecent(list.slice(0, 12));
+}
+function showHome() { autosave(); homeOpen = true; home.style.display = 'block'; renderHome(); }
+function closeHome() { homeOpen = false; home.style.display = 'none'; }
+function startDesign(d) { autosave(); doc = d; sel.clear(); undoS = []; redoS = []; fileName = ''; savedSnap = snapshot(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
+function openRecent(e) {
+  try { const d = JSON.parse(e.doc); if (!Array.isArray(d.items)) throw new Error('damaged'); startDesign({ id: e.id, title: String(d.title || e.title || 'Untitled design'), items: d.items.map(cleanItem) }); }
+  catch (err) { toast('Cannot open this design'); }
+}
+function removeRecent(id) { writeRecent(readRecent().filter((e) => e.id !== id)); renderHome(); }
+function ago(t) { const d = new Date(t), now = new Date(); const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); const diff = Math.round((day(now) - day(d)) / 86400000); const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); return diff <= 0 ? 'Today ' + hm : diff === 1 ? 'Yesterday ' + hm : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); }
+function thumbBox(svgStr, cls = '') { const box = h('div', { class: 'thumb ' + cls }); if (svgStr) box.append(h('img', { src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr), alt: '' })); else box.append(h('span', { class: 'muted', text: 'Empty' })); return box; }
+function renderHome() {
+  home.textContent = '';
+  const recent = readRecent();
+  const start = h('div', { class: 'home-row' },
+    h('button', { class: 'hcard hnew', onclick: showSizePicker }, h('div', { class: 'thumb plus' }, h('span', { text: '+' })), h('div', { class: 'hname', text: 'New design' }), h('div', { class: 'hsub', text: 'Pick a size: phone, desktop, social, canvas' })),
+    h('button', { class: 'hcard', onclick: () => openDoc() }, h('div', { class: 'thumb plus' }, h('span', { text: '\u2191' })), h('div', { class: 'hname', text: 'Open file' }), h('div', { class: 'hsub', text: 'A .frameout file from your computer' })),
+    h('button', { class: 'hcard', onclick: () => startDesign(sampleDoc()) }, h('div', { class: 'thumb plus' }, h('span', { text: '\u25A3' })), h('div', { class: 'hname', text: 'Example' }), h('div', { class: 'hsub', text: 'Two linked mobile screens to explore' })));
+  const grid = h('div', { class: 'home-grid' });
+  for (const e of recent) {
+    grid.append(h('div', { class: 'hcard', tabindex: 0, role: 'button', onclick: () => openRecent(e), onkeydown: (ev) => { if (ev.key === 'Enter') openRecent(e); } },
+      thumbBox(e.svg), h('div', { class: 'hname', text: e.title || 'Untitled design' }), h('div', { class: 'hsub', text: 'Edited ' + ago(e.time) }),
+      h('button', { class: 'btn hrm', title: 'Remove from recent', onclick: (ev) => { ev.stopPropagation(); removeRecent(e.id); }, text: 'Remove' })));
+  }
+  home.append(h('div', { class: 'home-in' },
+    h('div', { class: 'home-head' }, h('img', { src: 'logo.png', width: 32, height: 32, alt: '', onerror: (e) => e.target.remove() }), h('h1', { text: 'Frameout' }), h('span', { class: 'grow' }), session ? btn('Back to design', closeHome) : h('span'), btn('New design', showSizePicker, 'primary')),
+    h('h2', { text: 'Start' }), start,
+    h('h2', { text: 'Recent' }), recent.length ? grid : h('div', { class: 'muted', style: 'padding:8px 2px', text: 'Designs you work on appear here, with a small picture, and are kept on this computer.' })));
+}
+const SIZES = [
+  ['Phone', [['iPhone', 393, 852], ['Android', 360, 800], ['Small phone', 320, 568]]],
+  ['Tablet', [['iPad portrait', 768, 1024], ['iPad landscape', 1024, 768]]],
+  ['Desktop (PC)', [['Desktop', 1440, 1024], ['Laptop', 1280, 800], ['Wireframe', 1024, 768]]],
+  ['Social', [['Instagram post', 1080, 1080], ['Instagram portrait', 1080, 1350], ['Instagram story', 1080, 1920], ['YouTube thumbnail', 1280, 720], ['Facebook cover', 820, 312]]],
+  ['Canvas', [['Blank canvas', 0, 0]]]];
+function showSizePicker() {
+  let pick = SIZES[0][1][0];
+  const W = h('input', { type: 'number', min: 16, max: 10000, value: pick[1], style: 'width:90px' }), H = h('input', { type: 'number', min: 16, max: 10000, value: pick[2], style: 'width:90px' });
+  const tiles = [];
+  const mark = () => tiles.forEach(([b, t]) => b.classList.toggle('on', t === pick));
+  const groups = SIZES.map(([g, list]) => h('div', {}, h('h3', { text: g }), h('div', { class: 'tiles' }, list.map((t) => {
+    const k = t[1] ? 34 / Math.max(t[1], t[2]) : 0, mini = h('span', { class: 'mini', style: t[1] ? `width:${Math.max(6, t[1] * k)}px;height:${Math.max(6, t[2] * k)}px` : 'width:26px;height:26px;border-style:dashed' });
+    const b = h('button', { class: 'tile', onclick: () => { pick = t; W.value = t[1] || ''; H.value = t[2] || ''; W.disabled = H.disabled = !t[1]; mark(); } }, h('span', { class: 'minibox' }, mini), h('span', { class: 'tn', text: t[0] }), h('span', { class: 'td', text: t[1] ? t[1] + ' \u00D7 ' + t[2] : 'No frame' }));
+    tiles.push([b, t]); return b; }))));
+  mark();
+  const back = h('div', { class: 'modal-back' });
+  const close = () => back.remove();
+  const create = () => {
+    let w = Math.round(+W.value), hh = Math.round(+H.value); const blank = !pick[1];
+    if (!blank && (!(w >= 16 && w <= 10000) || !(hh >= 16 && hh <= 10000))) { toast('Use a width and height between 16 and 10000'); return; }
+    close(); const d = { id: uid(), title: 'Untitled design', items: [] };
+    const keep = doc; doc = d;
+    if (!blank) { const f = makeItem('frame', 0, 0, w, hh); f.name = pick[0] === 'Custom' ? 'Frame' : pick[0]; d.items.push(f); }
+    doc = keep; startDesign(d); if (d.items.length) { sel = new Set([d.items[0].id]); render(); }
+  };
+  [W, H].forEach((el) => el.addEventListener('input', () => { pick = ['Custom', 0, 0]; pick[1] = 1; tiles.forEach(([b]) => b.classList.remove('on')); }));
+  const m = h('div', { class: 'modal', style: 'width:660px;max-width:92vw;overflow:hidden' }, h('h2', { text: 'New design' }), h('div', { class: 'muted', text: 'Choose a size for your first frame. You can add more frames of any size later.' }), h('div', { style: 'overflow:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:6px;padding-right:6px' }, ...groups),
+    h('div', { class: 'row', style: 'gap:8px;align-items:center;display:flex' }, h('span', { text: 'Custom size' }), W, h('span', { text: '\u00D7' }), H, h('span', { class: 'grow' }), btn('Cancel', close), btn('Create', create, 'primary')));
+  back.addEventListener('mousedown', (e) => { if (e.target === back) close(); }); back.append(m); document.body.append(back);
+}
+setInterval(autosave, 3000); window.addEventListener('pagehide', autosave);
+setTool('select'); render(); showHome();
 window.addEventListener('resize', () => applyView());
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', async (e) => {

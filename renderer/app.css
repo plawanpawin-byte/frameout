@@ -1,1 +1,27 @@
 /* app styles */
+
+/* home screen */
+.home{position:fixed;inset:0;z-index:40;background:var(--bg);overflow:auto;display:none}
+.home-in{max-width:1080px;margin:0 auto;padding:28px 40px 60px}
+.home-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.home-head h1{font-size:24px;font-weight:400;margin:0}
+.home h2{font-size:15px;font-weight:500;color:var(--text-2);margin:26px 0 12px}
+.home-row,.home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px}
+.hcard{position:relative;display:flex;flex-direction:column;gap:4px;text-align:left;background:transparent;border:0;border-radius:14px;padding:8px;color:var(--text);font:inherit;cursor:pointer}
+.hcard:hover,.hcard:focus-visible{background:var(--bg-2)}
+.hcard .thumb{height:150px;border-radius:10px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;overflow:hidden;padding:12px;box-sizing:border-box}
+.hcard .thumb img{max-width:100%;max-height:100%;object-fit:contain;box-shadow:0 1px 6px rgba(0,0,0,.5);background:#fff}
+.hcard .thumb.plus span{font-size:40px;color:var(--accent);line-height:1}
+.hname{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:6px}
+.hsub{font-size:12px;color:var(--text-3)}
+.hrm{position:absolute;top:14px;right:14px;height:24px;font-size:11px;opacity:0}
+.hcard:hover .hrm,.hcard:focus-within .hrm{opacity:1}
+.tiles{display:flex;flex-wrap:wrap;gap:8px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:2px;width:112px;padding:8px 6px;background:var(--bg-3);border:1px solid transparent;border-radius:12px;color:var(--text);font:inherit;cursor:pointer}
+.tile:hover{background:var(--bg-4)}
+.tile.on{background:var(--accent-soft);border-color:var(--accent)}
+.tile .minibox{width:40px;height:40px;display:flex;align-items:center;justify-content:center}
+.tile .mini{display:block;border:1.5px solid var(--text-2);border-radius:2px;box-sizing:border-box}
+.tile .tn{font-size:12px;text-align:center}
+.tile .td{font-size:11px;color:var(--text-3)}
+.modal h3{font-size:12px;font-weight:500;color:var(--text-3);margin:4px 0 6px}

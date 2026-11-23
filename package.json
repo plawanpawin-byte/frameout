@@ -1,7 +1,7 @@
 {
   "name": "frameout",
   "productName": "Frameout",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Design screens and clickable prototypes on an infinite canvas.",
   "main": "main.js",
   "author": "Lookout",

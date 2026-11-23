@@ -14,7 +14,7 @@ Frameout is a canvas for designing app screens and web pages. Draw a frame for e
 
 ![Frameout](screenshots/01-canvas.png)
 
-**On this page:** [In plain words](#in-plain-words) · [Who it is for](#who-it-is-for) · [Try it in 3 steps](#try-it-in-3-steps) · [Screenshots](#see-it-in-action) · [Features](#everything-it-can-do) · [How to use it](#how-to-use-it) · [Privacy](#private-by-design) · [Install](#install) · [Questions](#questions)
+**On this page:** [In plain words](#in-plain-words) · [Who it is for](#who-it-is-for) · [Home screen](#the-home-screen) · [Try it in 3 steps](#try-it-in-3-steps) · [Screenshots](#see-it-in-action) · [Features](#everything-it-can-do) · [How to use it](#how-to-use-it) · [Privacy](#private-by-design) · [Install](#install) · [Questions](#questions)
 
 ## In plain words
 
@@ -30,15 +30,29 @@ Then comes the part that makes it a prototype: you can **link a shape to another
 - **Developers** who need a quick layout sketch.
 - **Students** doing interface-design assignments.
 
+## The home screen
+
+Frameout opens on a home screen. **Recent** shows the designs you worked on, each with a small picture of its first screen, its name and when you last edited it. Click one to carry on. Your work is kept automatically on this computer, so you do not have to save a file to find it again. Use **Remove** on a card to take it off the list.
+
+![Home screen](screenshots/06-home.png)
+
+Choose **New design** and pick a size for your first frame: phone, tablet, desktop (PC), Instagram post, portrait or story, YouTube thumbnail, Facebook cover, a blank canvas without a frame, or your own width and height.
+
+![New design sizes](screenshots/07-new-design.png)
+
+Press **Home** in the top bar at any time to come back to this screen. Your design is saved to Recent first.
+
 ## Try it in 3 steps
 
-1. Add a frame and draw a rectangle and some text inside it.
+1. Press **New design**, pick a size, then draw a rectangle and some text inside the frame.
 2. Add a second frame and link a button in the first frame to it.
 3. Press **Preview** and click through your screens, then export one as an image.
 
-## What is new in 1.0.13
+## What is new
 
-A new look inspired by Google's own tools (AI Studio, Colab, Gemini): a calm dark charcoal theme, rounded pill buttons, a soft blue accent and roomier spacing. The app icon is now a colour logo so you can find Frameout at a glance in the Start menu and in the Lookout launcher. All screenshots below were taken again with the new look. The program now shows under its own name (not Electron) in Task Manager and the taskbar.
+**1.0.15:** a home screen with your recent designs and a size picker for new ones (phone, tablet, PC, Instagram and more). Duplicate, copy and delete now take everything inside a frame with them, and a copied screen is placed beside the original. Auto layout works with frames inside frames.
+
+**1.0.13:** A new look inspired by Google's own tools (AI Studio, Colab, Gemini): a calm dark charcoal theme, rounded pill buttons, a soft blue accent and roomier spacing. The app icon is now a colour logo so you can find Frameout at a glance in the Start menu and in the Lookout launcher. All screenshots below were taken again with the new look. The program now shows under its own name (not Electron) in Task Manager and the taskbar.
 
 ## In plain words
 
@@ -54,9 +68,21 @@ Then comes the part that makes it a prototype: you can **link a shape to another
 - **Developers** who need a quick layout sketch.
 - **Students** doing interface-design assignments.
 
+## The home screen
+
+Frameout opens on a home screen. **Recent** shows the designs you worked on, each with a small picture of its first screen, its name and when you last edited it. Click one to carry on. Your work is kept automatically on this computer, so you do not have to save a file to find it again. Use **Remove** on a card to take it off the list.
+
+![Home screen](screenshots/06-home.png)
+
+Choose **New design** and pick a size for your first frame: phone, tablet, desktop (PC), Instagram post, portrait or story, YouTube thumbnail, Facebook cover, a blank canvas without a frame, or your own width and height.
+
+![New design sizes](screenshots/07-new-design.png)
+
+Press **Home** in the top bar at any time to come back to this screen. Your design is saved to Recent first.
+
 ## Try it in 3 steps
 
-1. Add a frame and draw a rectangle and some text inside it.
+1. Press **New design**, pick a size, then draw a rectangle and some text inside the frame.
 2. Add a second frame and link a button in the first frame to it.
 3. Press **Preview** and click through your screens, then export one as an image.
 
