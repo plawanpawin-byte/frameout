@@ -65,6 +65,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.22:** the bottom bar is smaller and holds more: a Hand tool (H) to pan, Undo, Redo, Duplicate, Delete, Create component, Zoom out, Zoom in, Fit and Preview, next to the drawing tools.
+
 **1.0.21:** the tool bar at the bottom is wider and lower, so it covers less of your design.
 
 **1.0.20:** the drawing tools (Move, Frame, Rectangle, Ellipse, Line, Text) now sit in a floating bar at the bottom of the canvas, like Figma, with larger icons. Shortcuts V, F, R, O, L and T still work.

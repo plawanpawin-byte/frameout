@@ -114,28 +114,37 @@ const btn = (label, fn, cls = '') => h('button', { class: 'btn ' + cls, onclick:
 const toolBtns = {};
 const TOOLS = [['select', 'Move'], ['frame', 'Frame'], ['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['line', 'Line'], ['text', 'Text']];
 const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', oninput: (e) => { doc.title = e.target.value; }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); } });
-toolbar.append(btn('Home', () => showHome('home')), btn('New', newDoc), btn('Open', openDoc), btn('Save', saveDoc, 'primary'), h('span', { class: 'sep' }));
-toolbar.append(btn('Undo', undo), btn('Redo', redo), btn('Duplicate', dupe), btn('Delete', del), h('span', { class: 'sep' }),
-  btn('-', () => zoomBy(1 / 1.2), 'icon'), btn('+', () => zoomBy(1.2), 'icon'), btn('Fit', fit), h('span', { class: 'grow' }), titleInput,
+toolbar.append(btn('Home', () => showHome('home')), btn('New', newDoc), btn('Open', openDoc), btn('Save', saveDoc, 'primary'));
+toolbar.append(h('span', { class: 'grow' }), titleInput,
   btn('Preview', startPreview), btn('Export PNG', () => exportImg('png')), btn('Export SVG', () => exportImg('svg')));
 // floating tool dock at the bottom of the canvas, like Figma
-const TOOL_ICONS = {
+const DOCK_ICONS = {
   select: '<path d="M5 3l14 7-6 2-2 6z"/>',
+  hand: '<path d="M8 13V6a1.5 1.5 0 0 1 3 0v5M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2-4a1.5 1.5 0 0 1 2.4-1.7L8 14"/>',
   frame: '<path d="M7 3v18M17 3v18M3 7h18M3 17h18"/>',
   rect: '<rect x="4" y="5" width="16" height="14" rx="2"/>',
   ellipse: '<circle cx="12" cy="12" r="8"/>',
   line: '<path d="M5 19L19 5"/>',
   text: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
+  dupe: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  del: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
+  comp: '<path d="M12 3l4 4-4 4-4-4zM12 13l4 4-4 4-4-4zM3 8l4 4-4 4M21 8l-4 4 4 4"/>',
+  zout: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5M8 11h6"/>',
+  zin: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5M8 11h6M11 8v6"/>',
+  fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  play: '<path d="M7 4l13 8-13 8z"/>',
 };
+const dockIcon = (k) => { const ico = sv('svg', { viewBox: '0 0 24 24', width: 18, height: 18, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' }); for (const n of [...new DOMParser().parseFromString('<svg xmlns="' + NS + '">' + DOCK_ICONS[k] + '</svg>', 'image/svg+xml').documentElement.childNodes]) ico.append(document.importNode(n, true)); return ico; };
 const dock = h('div', { class: 'dock', role: 'toolbar', 'aria-label': 'Tools' });
-for (const [k, label, key] of [['select', 'Move', 'V'], ['frame', 'Frame', 'F'], ['rect', 'Rectangle', 'R'], ['ellipse', 'Ellipse', 'O'], ['line', 'Line', 'L'], ['text', 'Text', 'T']]) {
-  const ico = sv('svg', { viewBox: '0 0 24 24', width: 22, height: 22, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' });
-  for (const n of [...new DOMParser().parseFromString('<svg xmlns="' + NS + '">' + TOOL_ICONS[k] + '</svg>', 'image/svg+xml').documentElement.childNodes]) ico.append(document.importNode(n, true));
-  const b = h('button', { class: 'dk', title: label + ' (' + key + ')', 'aria-label': label, onclick: () => setTool(k) }, ico);
-  toolBtns[k] = b; dock.append(b);
-}
+const dockGroup = (items, tools) => { const g = h('div', { class: 'dg' }); for (const [k, label, key, fn] of items) { const b = h('button', { class: 'dk', title: label + (key ? ' (' + key + ')' : ''), 'aria-label': label, onclick: tools ? () => setTool(k) : fn }, dockIcon(k)); if (tools) toolBtns[k] = b; g.append(b); } dock.append(g); };
+dockGroup([['select', 'Move', 'V'], ['hand', 'Hand (pan)', 'H'], ['frame', 'Frame', 'F'], ['rect', 'Rectangle', 'R'], ['ellipse', 'Ellipse', 'O'], ['line', 'Line', 'L'], ['text', 'Text', 'T']], true);
+dockGroup([['undo', 'Undo', 'Ctrl+Z', () => undo()], ['redo', 'Redo', 'Ctrl+Y', () => redo()], ['dupe', 'Duplicate', 'Ctrl+D', () => dupe()], ['del', 'Delete', 'Del', () => del()]], false);
+dockGroup([['comp', 'Create component', '', () => { const i = doc.items.find((x) => sel.has(x.id)); if (sel.size === 1 && i) makeComponent(i); else toast('Select one layer first'); }], ['zout', 'Zoom out', '', () => zoomBy(1 / 1.2)], ['zin', 'Zoom in', '', () => zoomBy(1.2)], ['fit', 'Fit to screen', '', () => fit()]], false);
+dockGroup([['play', 'Preview', '', () => startPreview()]], false);
 stage.append(dock);
-function setTool(t) { tool = t; for (const k in toolBtns) toolBtns[k].classList.toggle('on', k === t); svg.style.cursor = t === 'select' ? 'default' : 'crosshair'; }
+function setTool(t) { tool = t; for (const k in toolBtns) toolBtns[k].classList.toggle('on', k === t); svg.style.cursor = t === 'select' ? 'default' : t === 'hand' ? 'grab' : 'crosshair'; }
 
 const svg = sv('svg', { width: '100%', height: '100%', style: 'display:block;touch-action:none;background:#1c1c1c' });
 const world = sv('g'); const gItems = sv('g'), gUI = sv('g');
@@ -295,7 +304,7 @@ function newDoc() { showSizePicker(); }
 let drag = null, spaceDown = false;
 svg.addEventListener('pointerdown', (ev) => {
   svg.setPointerCapture(ev.pointerId);
-  if (ev.button === 1 || spaceDown) { drag = { mode: 'pan', sx: ev.clientX, sy: ev.clientY, px: panX, py: panY }; return; }
+  if (ev.button === 1 || spaceDown || tool === 'hand') { drag = { mode: 'pan', sx: ev.clientX, sy: ev.clientY, px: panX, py: panY }; return; }
   const p = toW(ev);
   const hd = ev.target.dataset.handle;
   if (hd) { const i = get([...sel][0]); commit(); drag = { mode: 'resize', hd, i, o: { ...i }, p }; return; }
@@ -373,7 +382,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Delete' || e.key === 'Backspace') del();
   else if (e.key === 'Escape') { sel.clear(); setTool('select'); render(); }
   else if (e.key.startsWith('Arrow') && sel.size) { e.preventDefault(); const d = e.shiftKey ? 10 : 1; commit(); doc.items.filter((i) => sel.has(i.id)).forEach((i) => { if (e.key === 'ArrowLeft') i.x -= d; if (e.key === 'ArrowRight') i.x += d; if (e.key === 'ArrowUp') i.y -= d; if (e.key === 'ArrowDown') i.y += d; }); render(); }
-  else if (!e.ctrlKey && 'vfrolt'.includes(k) && k.length === 1) setTool({ v: 'select', f: 'frame', r: 'rect', o: 'ellipse', l: 'line', t: 'text' }[k]);
+  else if (!e.ctrlKey && 'vhfrolt'.includes(k) && k.length === 1) setTool({ v: 'select', h: 'hand', f: 'frame', r: 'rect', o: 'ellipse', l: 'line', t: 'text' }[k]);
 });
 document.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = false; });
 
