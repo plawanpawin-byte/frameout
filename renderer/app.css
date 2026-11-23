@@ -51,3 +51,11 @@
 .dk{width:34px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;border:0;border-radius:8px;background:transparent;color:var(--text-2);cursor:pointer}
 .dk:hover{background:var(--bg-3);color:var(--text)}
 .dk.on{background:var(--accent);color:var(--accent-ink)}
+.hsec{display:flex;align-items:center;justify-content:space-between;margin:18px 4px 4px 12px;font-size:12px;color:var(--text-3)}
+.hplus{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:8px;background:transparent;color:var(--text-2);cursor:pointer}
+.hplus:hover{background:var(--bg-3);color:var(--text)}
+.hfolders{display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0}
+.hfolders .htab span.hlabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-side.shut .hsec span{display:none}
+.home-side.shut .hsec{justify-content:center;margin:14px 0 4px}
+.frow{display:flex;align-items:center;gap:8px;margin-bottom:16px}

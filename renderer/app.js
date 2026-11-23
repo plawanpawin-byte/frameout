@@ -19,6 +19,7 @@ const ICONS = {
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   back: '<path d="M10 6l-6 6 6 6M4 12h16"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  folderplus: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/>',
   open: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   example: '<rect x="3" y="4" width="7" height="14" rx="2"/><rect x="14" y="6" width="7" height="14" rx="2"/><path d="M10 11h4"/>',
 };
@@ -421,10 +422,13 @@ function showPreviewFrame(f, how = 'none', noPush = false) {
 const cleanItem = (i) => ({ id: String(i.id || uid()), type: NAMES[i.type] ? i.type : 'rect', name: String(i.name || 'Layer'), x: +i.x || 0, y: +i.y || 0, w: +i.w || 0, h: +i.h || 0, fill: i.fill === 'none' ? 'none' : hex(i.fill, '#d0d0d0'), stroke: hex(i.stroke, '#000000'), sw: Math.max(0, +i.sw || 0), r: Math.max(0, +i.r || 0), op: clamp(+i.op || 1, 0.05, 1), text: String(i.text || ''), fs: clamp(+i.fs || 16, 6, 400), go: String(i.go || ''), tr: ['fade', 'slide'].includes(i.tr) ? i.tr : 'none', master: !!i.master, inst: i.inst ? String(i.inst) : undefined, instOf: i.instOf ? String(i.instOf) : undefined, instRoot: i.instRoot ? String(i.instRoot) : undefined, ov: !!i.ov, al: i.al && ['v', 'h'].includes(i.al.dir) ? { dir: i.al.dir, gap: Math.max(0, +i.al.gap || 0), pad: Math.max(0, +i.al.pad || 0), align: ['center', 'end'].includes(i.al.align) ? i.al.align : 'start', hug: !!i.al.hug } : undefined, hidden: !!i.hidden, locked: !!i.locked });
 async function openDoc(dropped) {
   const f = (dropped && dropped.data) ? dropped : (await window.host.openFiles({ filters: [['Frameout design', ['frameout', 'json']]] }))[0]; if (!f) return;
-  try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); autosave(); doc = { id: String(d.id || uid()).slice(0, 24), title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem) }; fileName = f.name; sel.clear(); undoS = []; savedSnap = snapshot(); session = true; closeHome(); fit(); }
+  try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); autosave(); doc = { id: String(d.id || uid()).slice(0, 24), title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem) }; fileName = f.name; fileBind = null; sel.clear(); undoS = []; savedSnap = snapshot(); session = true; closeHome(); fit(); }
   catch (e) { toast('Cannot open: ' + e.message); }
 }
-async function saveDoc() { const r = await window.host.saveFile({ name: (doc.title || 'design') + '.frameout', filters: [['Frameout design', ['frameout']]], data: new TextEncoder().encode(JSON.stringify(doc, null, 1)) }); if (r) { savedSnap = snapshot(); fileName = r.name; toast('Saved ' + r.name); renderStatus(); } }
+async function saveDoc() {
+  const bytes = new TextEncoder().encode(JSON.stringify(doc, null, 1));
+  if (fileBind) { try { const n = await window.host.folders.save(fileBind.key, fileBind.name, bytes, true); savedSnap = snapshot(); toast('Saved ' + n + ' in ' + fileBind.folder); renderStatus(); } catch (e) { fileBind = null; toast('Could not save to the folder. Choose another place.'); return saveDoc(); } return; }
+  const r = await window.host.saveFile({ name: (doc.title || 'design') + '.frameout', filters: [['Frameout design', ['frameout']]], data: bytes }); if (r) { savedSnap = snapshot(); fileName = r.name; toast('Saved ' + r.name); renderStatus(); } }
 function exportTarget(forced) { const f = forced || (sel.size === 1 ? get([...sel][0]) : null); if (f && f.type === 'frame') return { f, only: doc.items.filter((i) => i === f || inside(i, f)) }; const all = doc.items.filter((i) => !i.hidden); if (!all.length) return null; const x0 = Math.min(...all.map((i) => i.x)), y0 = Math.min(...all.map((i) => i.y)), x1 = Math.max(...all.map((i) => i.x + i.w)), y1 = Math.max(...all.map((i) => i.y + i.h)); return { f: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, only: all }; }
 function exportSvgString(forced) {
   const t = exportTarget(forced); if (!t) return null; const { f, only } = t;
@@ -482,7 +486,8 @@ function putSet(k, v) { try { const s = JSON.parse(localStorage.getItem(SET_KEY)
 let homeTab = 'home';
 function showHome(tab) { autosave(); homeOpen = true; if (tab) homeTab = tab; home.style.display = 'flex'; renderHome(); }
 function closeHome() { homeOpen = false; home.style.display = 'none'; }
-function startDesign(d) { autosave(); doc = d; sel.clear(); undoS = []; redoS = []; fileName = ''; savedSnap = snapshot(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
+let folders = [], fileBind = null;
+function startDesign(d, bind) { autosave(); fileBind = bind || null; doc = d; sel.clear(); undoS = []; redoS = []; fileName = ''; savedSnap = snapshot(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
 function openRecent(e) {
   try { const d = JSON.parse(e.doc); if (!Array.isArray(d.items)) throw new Error('damaged'); startDesign({ id: e.id, title: String(d.title || e.title || 'Untitled design'), items: d.items.map(cleanItem) }); }
   catch (err) { toast('Cannot open this design'); }
@@ -523,7 +528,12 @@ function homeHome() {
 function homeTemplates() {
   const grid = h('div', { class: 'home-grid' });
   for (const [name, sub, make] of TEMPLATES) grid.append(h('button', { class: 'hcard', onclick: () => startDesign(make()) }, thumbBox(docThumb(make())), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })));
-  return [h('div', { class: 'muted', style: 'margin:-6px 2px 12px', text: 'Start from a ready layout. Everything in it can be edited.' }), grid];
+  if (folderView.key !== 'templates') loadFolderFiles('templates');
+  const mine = h('div', { class: 'home-grid' }, folderView.key === 'templates' ? folderView.files.map((f) => fileCard(f, () => startDesign({ id: uid(), title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })) }), h('button', { class: 'btn hrm', title: 'Remove this template', onclick: async (ev) => { ev.stopPropagation(); if (confirm('Remove this template? Your original project file is not touched.')) { try { await window.host.folders.del('templates', f.name); } catch (e) { toast('Could not remove it'); } loadFolderFiles('templates'); } }, text: 'Remove' }))) : []);
+  return [h('div', { class: 'muted', style: 'margin:-6px 2px 12px', text: 'Start from a ready layout. Everything in it can be edited.' }), grid,
+    h('div', { class: 'frow', style: 'margin-top:26px' }, h('h2', { style: 'margin:0', text: 'My templates' }), h('span', { class: 'grow' }), btn('Add your project', () => importInto('templates'), 'primary')),
+    h('div', { class: 'muted', style: 'margin:6px 2px 12px', text: 'Upload a .frameout file and it becomes a template you can start new designs from. A copy is kept inside Frameout.' }),
+    folderView.key === 'templates' && !folderView.files.length && !folderView.loading ? h('div', { class: 'muted', style: 'padding:4px 2px', text: 'No templates of your own yet.' }) : mine];
 }
 function homeSettings() {
   const row = (label, sub, ctl) => h('div', { class: 'srow' }, h('div', {}, h('div', { text: label }), h('div', { class: 'hsub', text: sub })), h('span', { class: 'grow' }), ctl);
@@ -537,6 +547,32 @@ function homeSettings() {
     row('Privacy', 'Frameout never connects to the internet. Your designs stay on this computer.', h('span')),
     row('About', 'Frameout, part of the Lookout apps. Works fully offline.', h('span')))];
 }
+// ---------- folders (real folders on this computer) ----------
+let folderView = { key: '', files: [], missing: false, loading: false };
+async function loadFolders() { try { folders = await window.host.folders.list(); } catch (e) { folders = []; } }
+async function loadFolderFiles(key) {
+  folderView = { key, files: [], missing: false, loading: true };
+  try { const r = await window.host.folders.files(key); folderView = { key, files: r.files.map((f) => parseDesignFile(f)).filter(Boolean), missing: r.missing, loading: false }; } catch (e) { folderView = { key, files: [], missing: true, loading: false }; }
+  if (homeOpen && homeTab === (key === 'templates' ? 'templates' : 'folder:' + key)) renderHome();
+}
+function parseDesignFile(f) {
+  try { const d = JSON.parse(f.text); if (!d || !Array.isArray(d.items)) return null; const dd = { id: String(d.id || uid()).slice(0, 24), title: String(d.title || f.name.replace(/\.frameout$/i, '')), items: d.items.map(cleanItem) }; return { name: f.name, mtime: f.mtime, doc: dd, svg: docThumb(dd) }; } catch (e) { return null; }
+}
+async function addFolder() { const before = folders.length; try { folders = await window.host.folders.add(); } catch (e) { toast('Could not add the folder'); return; } if (folders.length > before) { homeTab = 'folder:' + folders[folders.length - 1].path; loadFolderFiles(folders[folders.length - 1].path); } renderHome(); }
+async function removeFolder(p) { if (!confirm('Remove this folder from Frameout? The folder and the files in it stay on your computer.')) return; folders = await window.host.folders.remove(p); homeTab = 'home'; renderHome(); }
+async function importInto(key) { try { const n = await window.host.folders.import(key); if (n) toast(n === 1 ? 'Added 1 file' : 'Added ' + n + ' files'); } catch (e) { toast('Could not add files'); } loadFolderFiles(key); }
+function openFromFolder(key, folderName, f) { const d = { id: f.doc.id, title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })) }; startDesign(d, { key, name: f.name, folder: folderName }); }
+async function newInFolder(key, folderName, d) { const bytes = new TextEncoder().encode(JSON.stringify(d, null, 1)); try { const n = await window.host.folders.save(key, d.title + '.frameout', bytes, false); fileBind = { key, name: n, folder: folderName }; savedSnap = snapshot(); } catch (e) { toast('Could not save into the folder'); } }
+function fileCard(f, fn, extra) { return h('div', { class: 'hcard', tabindex: 0, role: 'button', onclick: fn, onkeydown: (ev) => { if (ev.key === 'Enter') fn(); } }, thumbBox(f.svg), h('div', { class: 'hname', text: f.doc.title }), h('div', { class: 'hsub', text: f.name + ' · ' + ago(f.mtime) }), extra || null); }
+function homeFolder(key) {
+  const fo = folders.find((x) => x.path === key);
+  if (!fo) return [h('div', { class: 'muted', text: 'This folder is not in your list any more.' })];
+  if (folderView.key !== key) { loadFolderFiles(key); return [h('div', { class: 'muted', text: 'Loading…' })]; }
+  const grid = h('div', { class: 'home-grid' }, folderView.files.map((f) => fileCard(f, () => openFromFolder(key, fo.name, f))));
+  return [h('div', { class: 'muted', style: 'margin:-6px 2px 14px;word-break:break-all', text: fo.path }),
+    h('div', { class: 'frow' }, btn('New design here', () => showSizePicker({ key, name: fo.name }), 'primary'), btn('Add files', () => importInto(key)), btn('Open in Explorer', () => window.host.folders.open(key)), h('span', { class: 'grow' }), btn('Remove folder', () => removeFolder(key))),
+    folderView.loading ? h('div', { class: 'muted', text: 'Loading…' }) : folderView.missing ? h('div', { class: 'muted', text: 'This folder cannot be found. It may have been moved or deleted.' }) : folderView.files.length ? grid : h('div', { class: 'muted', style: 'padding:8px 2px', text: 'No designs here yet. Press New design here, or Add files to bring in .frameout files you already have.' })];
+}
 function renderHome() {
   home.textContent = '';
   const tabs = [['home', 'Home', 'home'], ['templates', 'Templates', 'templates'], ['settings', 'Settings', 'settings']];
@@ -544,10 +580,14 @@ function renderHome() {
   const side = h('nav', { class: 'home-side' + (shut ? ' shut' : '') },
     h('div', { class: 'home-logo' }, h('button', { class: 'htab hbar', title: shut ? 'Open sidebar' : 'Close sidebar', 'aria-label': 'Toggle sidebar', onclick: () => { putSet('sideShut', !shut); renderHome(); } }, h('span', { class: 'hic' }, icon('menu'))), h('span', { class: 'hlabel', text: 'Frameout' })),
     tabs.map(([id, name, ic]) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), title: name, onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic' }, icon(ic)), h('span', { class: 'hlabel', text: name }))),
+    h('div', { class: 'hsec' }, h('span', { class: 'hlabel', text: 'Folders' }), h('button', { class: 'hplus', title: 'Add a folder from this computer', 'aria-label': 'Add folder', onclick: addFolder }, icon('plus', 16))),
+    h('div', { class: 'hfolders' }, folders.map((f) => h('button', { class: 'htab' + (homeTab === 'folder:' + f.path ? ' on' : ''), title: f.path, onclick: () => { homeTab = 'folder:' + f.path; loadFolderFiles(f.path); renderHome(); } }, h('span', { class: 'hic' }, icon('open')), h('span', { class: 'hlabel', text: f.name })))), 
+    shut ? h('button', { class: 'htab', title: 'Add folder', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus'))) : (folders.length ? h('span') : h('button', { class: 'htab', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus')), h('span', { class: 'hlabel', text: 'New folder' }))),
     h('span', { class: 'grow' }), session ? h('button', { class: 'htab', onclick: closeHome }, h('span', { class: 'hic' }, icon('back')), h('span', { class: 'hlabel', text: 'Back to design' })) : h('span'));
-  const body = homeTab === 'templates' ? homeTemplates() : homeTab === 'settings' ? homeSettings() : homeHome();
+  const isF = homeTab.startsWith('folder:'), fkey = isF ? homeTab.slice(7) : '', fo = isF ? folders.find((x) => x.path === fkey) : null;
+  const body = homeTab === 'templates' ? homeTemplates() : homeTab === 'settings' ? homeSettings() : isF ? homeFolder(fkey) : homeHome();
   home.append(side, h('div', { class: 'home-main' }, h('div', { class: 'home-in' },
-    h('div', { class: 'home-head' }, h('h1', { text: homeTab === 'templates' ? 'Templates' : homeTab === 'settings' ? 'Settings' : 'Home' }), h('span', { class: 'grow' }), btn('New design', showSizePicker, 'primary')), ...body)));
+    h('div', { class: 'home-head' }, h('h1', { text: homeTab === 'templates' ? 'Templates' : homeTab === 'settings' ? 'Settings' : isF ? (fo ? fo.name : 'Folder') : 'Home' }), h('span', { class: 'grow' }), btn('New design', () => showSizePicker(isF && fo ? { key: fkey, name: fo.name } : null), 'primary')), ...body)));
 }
 const SIZES = [
   ['Phone', [['iPhone', 393, 852], ['Android', 360, 800], ['Small phone', 320, 568]]],
@@ -555,7 +595,8 @@ const SIZES = [
   ['Desktop (PC)', [['Desktop', 1440, 1024], ['Laptop', 1280, 800], ['Wireframe', 1024, 768]]],
   ['Social', [['Instagram post', 1080, 1080], ['Instagram portrait', 1080, 1350], ['Instagram story', 1080, 1920], ['YouTube thumbnail', 1280, 720], ['Facebook cover', 820, 312]]],
   ['Canvas', [['Blank canvas', 0, 0]]]];
-function showSizePicker() {
+function showSizePicker(target) {
+  if (target && !target.key) target = null;
   let pick = SIZES[0][1][0];
   const W = h('input', { type: 'number', min: 16, max: 10000, value: pick[1], style: 'width:90px' }), H = h('input', { type: 'number', min: 16, max: 10000, value: pick[2], style: 'width:90px' });
   const nameIn = h('input', { type: 'text', maxlength: 80, value: 'Untitled design', style: 'flex:1;min-width:0', 'aria-label': 'Design name' });
@@ -568,14 +609,14 @@ function showSizePicker() {
   mark();
   const back = h('div', { class: 'modal-back' });
   const close = () => back.remove();
-  groups.push(h('div', {}, h('h3', { text: 'Or start from a template' }), h('div', { class: 'tiles' }, TEMPLATES.map(([name, sub, make]) => h('button', { class: 'tile', onclick: () => { close(); const d = make(); const n = nameIn.value.trim(); if (n && n !== 'Untitled design') d.title = n; startDesign(d); } }, h('span', { class: 'minibox' }, icon('templates', 24)), h('span', { class: 'tn', text: name }), h('span', { class: 'td', text: sub.split(' ').slice(0, 3).join(' ') }))))));
+  groups.push(h('div', {}, h('h3', { text: 'Or start from a template' }), h('div', { class: 'tiles' }, TEMPLATES.map(([name, sub, make]) => h('button', { class: 'tile', onclick: () => { close(); const d = make(); const n = nameIn.value.trim(); if (n && n !== 'Untitled design') d.title = n; startDesign(d); if (target) newInFolder(target.key, target.name, d); } }, h('span', { class: 'minibox' }, icon('templates', 24)), h('span', { class: 'tn', text: name }), h('span', { class: 'td', text: sub.split(' ').slice(0, 3).join(' ') }))))));
   const create = () => {
     let w = Math.round(+W.value), hh = Math.round(+H.value); const blank = !pick[1];
     if (!blank && (!(w >= 16 && w <= 10000) || !(hh >= 16 && hh <= 10000))) { toast('Use a width and height between 16 and 10000'); return; }
     close(); const d = { id: uid(), title: nameIn.value.trim() || 'Untitled design', items: [] };
     const keep = doc; doc = d;
     if (!blank) { const f = makeItem('frame', 0, 0, w, hh); f.name = pick[0] === 'Custom' ? 'Frame' : pick[0]; d.items.push(f); }
-    doc = keep; startDesign(d); if (d.items.length) { sel = new Set([d.items[0].id]); render(); }
+    doc = keep; startDesign(d); if (d.items.length) { sel = new Set([d.items[0].id]); render(); } if (target) newInFolder(target.key, target.name, d);
   };
   [W, H].forEach((el) => el.addEventListener('input', () => { pick = ['Custom', 0, 0]; pick[1] = 1; tiles.forEach(([b]) => b.classList.remove('on')); }));
   const m = h('div', { class: 'modal', style: 'width:660px;max-width:92vw;overflow:hidden' }, h('h2', { text: 'New design' }), h('label', { class: 'row', style: 'display:flex;gap:10px;align-items:center' }, h('span', { text: 'Name' }), nameIn), h('div', { class: 'muted', text: 'Choose a size for your first frame. You can add more frames of any size later.' }), h('div', { style: 'overflow:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:6px;padding-right:6px' }, ...groups),
@@ -583,7 +624,7 @@ function showSizePicker() {
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); }); back.append(m); document.body.append(back);
 }
 setInterval(autosave, 3000); window.addEventListener('pagehide', autosave);
-setTool('select'); render(); showHome();
+setTool('select'); render(); loadFolders().then(() => { if (homeOpen) renderHome(); }); showHome();
 if (getSet('openOn') === 'last') { const r = readRecent()[0]; if (r) openRecent(r); }
 window.addEventListener('resize', () => applyView());
 window.addEventListener('dragover', (e) => e.preventDefault());

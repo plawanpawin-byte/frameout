@@ -55,6 +55,16 @@ The **Templates** tab shows every ready layout with a small picture. **Settings*
 
 ![Settings tab](screenshots/09-settings.png)
 
+### Folders and your own templates
+
+Under **Folders** in the left bar, press **+** to choose a folder on your computer (the folder window lets you make a new one). The folder appears in the bar. Open it to see the designs inside, press **New design here** to start one that saves straight into that folder, or **Add files** to bring in `.frameout` files you already have. **Save** keeps writing to the same file. Removing a folder only removes it from the list; your files stay where they are.
+
+![A folder](screenshots/11-folder.png)
+
+In **Templates**, **My templates** lets you upload your own `.frameout` project. It becomes a template you can start new designs from (a copy is kept inside Frameout, your original is not touched).
+
+![My templates](screenshots/12-my-templates.png)
+
 Press **Home** in the top bar at any time to come back to this screen. Your design is saved to Recent first.
 
 ## Try it in 3 steps
@@ -64,6 +74,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 3. Press **Preview** and click through your screens, then export one as an image.
 
 ## What is new
+
+**1.0.24:** folders on your computer in the left bar, and your own projects as templates.
 
 **1.0.23:** after you place a text layer you can type straight away, and double-click a text layer to edit it, instead of hunting for the Text box in the right panel.
 

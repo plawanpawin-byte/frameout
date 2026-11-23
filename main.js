@@ -1,11 +1,12 @@
 'use strict';
 // Frameout main process. Local-only: no network access, files only via user-chosen dialogs.
-const { app, BrowserWindow, ipcMain, dialog, session, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
 const TITLE = 'Frameout';
+if (process.env.LK_USERDATA) app.setPath('userData', process.env.LK_USERDATA); // test runs only
 const granted = new Map(); // opaque id -> absolute path the user picked in a dialog
 let win = null;
 
@@ -77,6 +78,59 @@ ipcMain.handle('file:write', async (_e, id, data) => {
 });
 
 ipcMain.handle('file:read', async (_e, id) => fs.readFileSync(pathOf(id)));
+
+
+// ---------- folders: real folders on this computer that the user picked ----------
+// The list lives in userData/folders.json and only grows through the folder dialog. 'templates' is the app's own folder for "My templates".
+const FOLDER_FILE = () => path.join(app.getPath('userData'), 'folders.json');
+const TPL_DIR = () => path.join(app.getPath('userData'), 'templates');
+const MAX_READ = 6 * 1024 * 1024;
+function readFolders() { try { const l = JSON.parse(fs.readFileSync(FOLDER_FILE(), 'utf8')); return Array.isArray(l) ? l.filter((p) => typeof p === 'string') : []; } catch (_) { return []; } }
+function writeFolders(l) { fs.mkdirSync(path.dirname(FOLDER_FILE()), { recursive: true }); fs.writeFileSync(FOLDER_FILE(), JSON.stringify(l)); }
+const folderInfo = (p) => ({ path: p, name: path.basename(p) || p, exists: fs.existsSync(p) });
+function dirOf(key) {
+  if (key === 'templates') { fs.mkdirSync(TPL_DIR(), { recursive: true }); return TPL_DIR(); }
+  const k = path.resolve(String(key));
+  if (!readFolders().some((p) => path.resolve(p).toLowerCase() === k.toLowerCase())) throw new Error('Folder was not chosen by the user');
+  return k;
+}
+const isDesign = (n) => /\.frameout$/i.test(n);
+function uniqueIn(dir, name) {
+  const base = safeName(name).replace(/\.frameout$/i, '') || 'design';
+  let n = base + '.frameout', i = 2;
+  while (fs.existsSync(path.join(dir, n))) n = base + ' ' + (i++) + '.frameout';
+  return n;
+}
+ipcMain.handle('folders:list', () => readFolders().map(folderInfo));
+ipcMain.handle('folders:add', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Choose a folder for your designs (you can make a new one in this window)', properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths.length) return readFolders().map(folderInfo);
+  const l = readFolders(); for (const p of r.filePaths) if (!l.some((x) => path.resolve(x).toLowerCase() === path.resolve(p).toLowerCase())) l.push(p);
+  writeFolders(l); return l.map(folderInfo);
+});
+ipcMain.handle('folders:remove', (_e, p) => { const k = path.resolve(String(p)).toLowerCase(); writeFolders(readFolders().filter((x) => path.resolve(x).toLowerCase() !== k)); return readFolders().map(folderInfo); });
+ipcMain.handle('folders:files', (_e, key) => {
+  const dir = dirOf(key); const out = [];
+  let names = []; try { names = fs.readdirSync(dir); } catch (_) { return { missing: true, files: [] }; }
+  for (const n of names) {
+    if (!isDesign(n)) continue;
+    try { const st = fs.statSync(path.join(dir, n)); if (!st.isFile()) continue; out.push({ name: n, mtime: st.mtimeMs, size: st.size, text: st.size <= MAX_READ ? fs.readFileSync(path.join(dir, n), 'utf8') : '' }); } catch (_) { /* skip */ }
+  }
+  out.sort((a, b) => b.mtime - a.mtime); return { missing: false, files: out };
+});
+ipcMain.handle('folders:import', async (_e, key) => {
+  const dir = dirOf(key);
+  const r = await dialog.showOpenDialog(win, { title: 'Add Frameout files', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Frameout design', extensions: ['frameout', 'json'] }] });
+  if (r.canceled) return 0; let n = 0;
+  for (const p of r.filePaths) { try { if (fs.statSync(p).size > MAX_READ) continue; const t = fs.readFileSync(p, 'utf8'); const d = JSON.parse(t); if (!d || !Array.isArray(d.items)) continue; fs.writeFileSync(path.join(dir, uniqueIn(dir, path.basename(p).replace(/\.json$/i, ''))), t); n++; } catch (_) { /* not a design */ } }
+  return n;
+});
+ipcMain.handle('folders:save', (_e, key, name, data, overwrite) => {
+  const dir = dirOf(key); const n = overwrite && isDesign(name) ? safeName(name) : uniqueIn(dir, name);
+  fs.writeFileSync(path.join(dir, n), Buffer.from(data)); return n;
+});
+ipcMain.handle('folders:delete', async (_e, key, name) => { if (key !== 'templates' || !isDesign(name)) throw new Error('Not allowed'); const f = path.join(dirOf(key), path.basename(String(name))); if (fs.existsSync(f)) await shell.trashItem(f); return true; });
+ipcMain.handle('folders:open', (_e, key) => shell.openPath(dirOf(key)));
 
 ipcMain.handle('app:info', () => ({ name: TITLE, version: app.getVersion() }));
 
