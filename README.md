@@ -43,6 +43,18 @@ Choose **New design** and pick a size for your first frame: phone, tablet, deskt
 
 ![New design sizes](screenshots/07-new-design.png)
 
+Below the sizes there is **Or start from a template**: pick one and you land in a ready layout.
+
+![Start from a template](screenshots/10-new-templates.png)
+
+### Templates and Settings
+
+The **Templates** tab shows every ready layout with a small picture. **Settings** has the options for opening, how many recent designs to keep, and clearing Recent.
+
+![Templates tab](screenshots/08-templates.png)
+
+![Settings tab](screenshots/09-settings.png)
+
 Press **Home** in the top bar at any time to come back to this screen. Your design is saved to Recent first.
 
 ## Try it in 3 steps
@@ -53,6 +65,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.18:** cleaner line icons in the left bar and on the Start cards, and the New design window now also lists the templates.
+
 **1.0.17:** the left bar can be closed to icons only (the ☰ button) and opens again the same way; Frameout remembers your choice.
 
 **1.0.16:** the home screen has a tab bar on the left: Home, Templates and Settings.
@@ -60,41 +74,6 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 **1.0.15:** a home screen with your recent designs and a size picker for new ones (phone, tablet, PC, Instagram and more). Duplicate, copy and delete now take everything inside a frame with them, and a copied screen is placed beside the original. Auto layout works with frames inside frames.
 
 **1.0.13:** A new look inspired by Google's own tools (AI Studio, Colab, Gemini): a calm dark charcoal theme, rounded pill buttons, a soft blue accent and roomier spacing. The app icon is now a colour logo so you can find Frameout at a glance in the Start menu and in the Lookout launcher. All screenshots below were taken again with the new look. The program now shows under its own name (not Electron) in Task Manager and the taskbar.
-
-## In plain words
-
-Frameout is a design tool for sketching **app screens and web pages** before anyone builds them. Each screen is a **frame** (a rectangle shaped like a phone, tablet or page). Inside a frame you draw rectangles, circles, lines and text, and arrange them in layers, so you can mock up a login screen or a shop page in minutes.
-
-Then comes the part that makes it a prototype: you can **link a shape to another frame**. Press Preview and click the button in your design to jump to the next screen, exactly as a real app would. You can export any screen as an image or SVG to show a client or a developer.
-
-**Not for:** Frameout is for layout sketches and click-through demos. It does not generate code and is not a photo editor.
-
-## Who it is for
-
-- **Designers and founders** who want to show an idea before it is built.
-- **Developers** who need a quick layout sketch.
-- **Students** doing interface-design assignments.
-
-## The home screen
-
-Frameout opens on a home screen. **Recent** shows the designs you worked on, each with a small picture of its first screen, its name and when you last edited it. Click one to carry on. Your work is kept automatically on this computer, so you do not have to save a file to find it again. Use **Remove** on a card to take it off the list.
-
-A bar on the left switches between three tabs. **Home** has Start and Recent. **Templates** has ready layouts to start from: mobile app, login screen, landing page, dashboard, Instagram quote and a 16:9 slide. **Settings** lets you choose whether Frameout opens on Home or on your last design, how many recent designs to keep (6, 12 or 24), and clear the Recent list.
-
-
-![Home screen](screenshots/06-home.png)
-
-Choose **New design** and pick a size for your first frame: phone, tablet, desktop (PC), Instagram post, portrait or story, YouTube thumbnail, Facebook cover, a blank canvas without a frame, or your own width and height.
-
-![New design sizes](screenshots/07-new-design.png)
-
-Press **Home** in the top bar at any time to come back to this screen. Your design is saved to Recent first.
-
-## Try it in 3 steps
-
-1. Press **New design**, pick a size, then draw a rectangle and some text inside the frame.
-2. Add a second frame and link a button in the first frame to it.
-3. Press **Preview** and click through your screens, then export one as an image.
 
 ## See it in action
 

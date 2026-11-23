@@ -12,6 +12,17 @@ const h = (tag, props = {}, ...kids) => {
 };
 const NS = 'http://www.w3.org/2000/svg';
 const sv = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+const ICONS = {
+  home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
+  templates: '<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="11" width="8" height="10" rx="2"/><rect x="3" y="14" width="8" height="7" rx="2"/>',
+  settings: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  back: '<path d="M10 6l-6 6 6 6M4 12h16"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  open: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  example: '<rect x="3" y="4" width="7" height="14" rx="2"/><rect x="14" y="6" width="7" height="14" rx="2"/><path d="M10 11h4"/>',
+};
+const icon = (name, size = 18) => { const s = sv('svg', { viewBox: '0 0 24 24', width: size, height: size, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.7, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' }); const d = new DOMParser().parseFromString('<svg xmlns="' + NS + '">' + ICONS[name] + '</svg>', 'image/svg+xml').documentElement; for (const n of [...d.childNodes]) s.append(document.importNode(n, true)); return s; };
 const uid = () => Math.random().toString(36).slice(2, 8);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const toast = (m) => { const t = h('div', { class: 'toast', text: m }); document.body.append(t); setTimeout(() => t.remove(), 2400); };
@@ -465,7 +476,7 @@ function tpl(title, specs) {
   const out = doc; doc = keep; return out;
 }
 function docThumb(d) { const keep = doc; let s = ''; try { doc = d; const fr = d.items.find((i) => i.type === 'frame'); const r = exportSvgString(fr || null); s = r ? r.str : ''; } catch (e) { /* no picture */ } doc = keep; return s; }
-function newCard(icon, name, sub, fn) { return h('button', { class: 'hcard', onclick: fn }, h('div', { class: 'thumb plus' }, h('span', { text: icon })), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })); }
+function newCard(ic, name, sub, fn) { return h('button', { class: 'hcard', onclick: fn }, h('div', { class: 'thumb plus' }, icon(ic, 40)), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })); }
 function homeHome() {
   const recent = readRecent();
   const grid = h('div', { class: 'home-grid' });
@@ -475,9 +486,9 @@ function homeHome() {
       h('button', { class: 'btn hrm', title: 'Remove from recent', onclick: (ev) => { ev.stopPropagation(); removeRecent(e.id); }, text: 'Remove' })));
   }
   return [h('h2', { text: 'Start' }), h('div', { class: 'home-row' },
-    newCard('+', 'New design', 'Pick a size: phone, desktop, social, canvas', showSizePicker),
-    newCard('↑', 'Open file', 'A .frameout file from your computer', () => openDoc()),
-    newCard('▣', 'Example', 'Two linked mobile screens to explore', () => startDesign(sampleDoc()))),
+    newCard('plus', 'New design', 'Pick a size: phone, desktop, social, canvas', showSizePicker),
+    newCard('open', 'Open file', 'A .frameout file from your computer', () => openDoc()),
+    newCard('example', 'Example', 'Two linked mobile screens to explore', () => startDesign(sampleDoc()))),
   h('h2', { text: 'Recent' }), recent.length ? grid : h('div', { class: 'muted', style: 'padding:8px 2px', text: 'Designs you work on appear here, with a small picture, and are kept on this computer.' })];
 }
 function homeTemplates() {
@@ -499,12 +510,12 @@ function homeSettings() {
 }
 function renderHome() {
   home.textContent = '';
-  const tabs = [['home', 'Home', '⌂'], ['templates', 'Templates', '▦'], ['settings', 'Settings', '⚙']];
+  const tabs = [['home', 'Home', 'home'], ['templates', 'Templates', 'templates'], ['settings', 'Settings', 'settings']];
   const shut = getSet('sideShut');
   const side = h('nav', { class: 'home-side' + (shut ? ' shut' : '') },
-    h('div', { class: 'home-logo' }, h('button', { class: 'htab hbar', title: shut ? 'Open sidebar' : 'Close sidebar', 'aria-label': 'Toggle sidebar', onclick: () => { putSet('sideShut', !shut); renderHome(); } }, h('span', { class: 'hic', text: '☰' })), h('span', { class: 'hlabel', text: 'Frameout' })),
-    tabs.map(([id, name, ic]) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), title: name, onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic', text: ic }), h('span', { class: 'hlabel', text: name }))),
-    h('span', { class: 'grow' }), session ? h('button', { class: 'htab', onclick: closeHome }, h('span', { class: 'hic', text: '←' }), h('span', { class: 'hlabel', text: 'Back to design' })) : h('span'));
+    h('div', { class: 'home-logo' }, h('button', { class: 'htab hbar', title: shut ? 'Open sidebar' : 'Close sidebar', 'aria-label': 'Toggle sidebar', onclick: () => { putSet('sideShut', !shut); renderHome(); } }, h('span', { class: 'hic' }, icon('menu'))), h('span', { class: 'hlabel', text: 'Frameout' })),
+    tabs.map(([id, name, ic]) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), title: name, onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic' }, icon(ic)), h('span', { class: 'hlabel', text: name }))),
+    h('span', { class: 'grow' }), session ? h('button', { class: 'htab', onclick: closeHome }, h('span', { class: 'hic' }, icon('back')), h('span', { class: 'hlabel', text: 'Back to design' })) : h('span'));
   const body = homeTab === 'templates' ? homeTemplates() : homeTab === 'settings' ? homeSettings() : homeHome();
   home.append(side, h('div', { class: 'home-main' }, h('div', { class: 'home-in' },
     h('div', { class: 'home-head' }, h('h1', { text: homeTab === 'templates' ? 'Templates' : homeTab === 'settings' ? 'Settings' : 'Home' }), h('span', { class: 'grow' }), btn('New design', showSizePicker, 'primary')), ...body)));
@@ -527,6 +538,7 @@ function showSizePicker() {
   mark();
   const back = h('div', { class: 'modal-back' });
   const close = () => back.remove();
+  groups.push(h('div', {}, h('h3', { text: 'Or start from a template' }), h('div', { class: 'tiles' }, TEMPLATES.map(([name, sub, make]) => h('button', { class: 'tile', onclick: () => { close(); startDesign(make()); } }, h('span', { class: 'minibox' }, icon('templates', 24)), h('span', { class: 'tn', text: name }), h('span', { class: 'td', text: sub.split(' ').slice(0, 3).join(' ') }))))));
   const create = () => {
     let w = Math.round(+W.value), hh = Math.round(+H.value); const blank = !pick[1];
     if (!blank && (!(w >= 16 && w <= 10000) || !(hh >= 16 && hh <= 10000))) { toast('Use a width and height between 16 and 10000'); return; }
