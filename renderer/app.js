@@ -129,7 +129,7 @@ const TOOL_ICONS = {
 };
 const dock = h('div', { class: 'dock', role: 'toolbar', 'aria-label': 'Tools' });
 for (const [k, label, key] of [['select', 'Move', 'V'], ['frame', 'Frame', 'F'], ['rect', 'Rectangle', 'R'], ['ellipse', 'Ellipse', 'O'], ['line', 'Line', 'L'], ['text', 'Text', 'T']]) {
-  const ico = sv('svg', { viewBox: '0 0 24 24', width: 26, height: 26, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' });
+  const ico = sv('svg', { viewBox: '0 0 24 24', width: 22, height: 22, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' });
   for (const n of [...new DOMParser().parseFromString('<svg xmlns="' + NS + '">' + TOOL_ICONS[k] + '</svg>', 'image/svg+xml').documentElement.childNodes]) ico.append(document.importNode(n, true));
   const b = h('button', { class: 'dk', title: label + ' (' + key + ')', 'aria-label': label, onclick: () => setTool(k) }, ico);
   toolBtns[k] = b; dock.append(b);

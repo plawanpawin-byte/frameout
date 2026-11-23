@@ -65,6 +65,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.21:** the tool bar at the bottom is wider and lower, so it covers less of your design.
+
 **1.0.20:** the drawing tools (Move, Frame, Rectangle, Ellipse, Line, Text) now sit in a floating bar at the bottom of the canvas, like Figma, with larger icons. Shortcuts V, F, R, O, L and T still work.
 
 **1.0.19:** you can name a design: a Name box in the New design window, and a name box at the top right of the editor to rename it any time. The name shows on its Recent card and is used as the file name when you save or export.
