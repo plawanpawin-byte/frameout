@@ -8,6 +8,10 @@
 .htab:hover{background:var(--bg-3);color:var(--text)}
 .htab.on{background:var(--accent-soft);color:var(--text)}
 .hic{width:18px;text-align:center;font-size:16px}
+.home-side.shut{width:60px}
+.home-side.shut .hlabel{display:none}
+.home-side.shut .home-logo{padding-left:0}
+.hbar{width:auto;padding:9px 12px}
 .home-main{flex:1;min-width:0;overflow:auto}
 .settings{display:flex;flex-direction:column;gap:2px;max-width:760px}
 .srow{display:flex;align-items:center;gap:16px;padding:14px 4px;border-bottom:1px solid var(--bg-3)}

@@ -436,8 +436,8 @@ function autosave() {
   list.unshift({ id: doc.id, title: doc.title || 'Untitled design', time: Date.now(), svg: svgStr, doc: s });
   writeRecent(list.slice(0, getSet('recentMax')));
 }
-const SET_KEY = 'frameout.settings', SET_DEF = { recentMax: 12, openOn: 'home' };
-function getSet(k) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); const v = s && s[k]; if (k === 'recentMax') return [6, 12, 24].includes(v) ? v : SET_DEF[k]; if (k === 'openOn') return v === 'last' ? 'last' : 'home'; } catch (e) { /* defaults */ } return SET_DEF[k]; }
+const SET_KEY = 'frameout.settings', SET_DEF = { recentMax: 12, openOn: 'home', sideShut: false };
+function getSet(k) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); const v = s && s[k]; if (k === 'recentMax') return [6, 12, 24].includes(v) ? v : SET_DEF[k]; if (k === 'openOn') return v === 'last' ? 'last' : 'home'; if (k === 'sideShut') return v === true; } catch (e) { /* defaults */ } return SET_DEF[k]; }
 function putSet(k, v) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {}; s[k] = v; localStorage.setItem(SET_KEY, JSON.stringify(s)); } catch (e) { /* not saved */ } }
 let homeTab = 'home';
 function showHome(tab) { autosave(); homeOpen = true; if (tab) homeTab = tab; home.style.display = 'flex'; renderHome(); }
@@ -500,10 +500,11 @@ function homeSettings() {
 function renderHome() {
   home.textContent = '';
   const tabs = [['home', 'Home', '⌂'], ['templates', 'Templates', '▦'], ['settings', 'Settings', '⚙']];
-  const side = h('nav', { class: 'home-side' },
-    h('div', { class: 'home-logo' }, h('img', { src: 'logo.png', width: 28, height: 28, alt: '', onerror: (e) => e.target.remove() }), h('span', { text: 'Frameout' })),
-    tabs.map(([id, name, ic]) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic', text: ic }), h('span', { text: name }))),
-    h('span', { class: 'grow' }), session ? h('button', { class: 'htab', onclick: closeHome }, h('span', { class: 'hic', text: '←' }), h('span', { text: 'Back to design' })) : h('span'));
+  const shut = getSet('sideShut');
+  const side = h('nav', { class: 'home-side' + (shut ? ' shut' : '') },
+    h('div', { class: 'home-logo' }, h('button', { class: 'htab hbar', title: shut ? 'Open sidebar' : 'Close sidebar', 'aria-label': 'Toggle sidebar', onclick: () => { putSet('sideShut', !shut); renderHome(); } }, h('span', { class: 'hic', text: '☰' })), h('span', { class: 'hlabel', text: 'Frameout' })),
+    tabs.map(([id, name, ic]) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), title: name, onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic', text: ic }), h('span', { class: 'hlabel', text: name }))),
+    h('span', { class: 'grow' }), session ? h('button', { class: 'htab', onclick: closeHome }, h('span', { class: 'hic', text: '←' }), h('span', { class: 'hlabel', text: 'Back to design' })) : h('span'));
   const body = homeTab === 'templates' ? homeTemplates() : homeTab === 'settings' ? homeSettings() : homeHome();
   home.append(side, h('div', { class: 'home-main' }, h('div', { class: 'home-in' },
     h('div', { class: 'home-head' }, h('h1', { text: homeTab === 'templates' ? 'Templates' : homeTab === 'settings' ? 'Settings' : 'Home' }), h('span', { class: 'grow' }), btn('New design', showSizePicker, 'primary')), ...body)));

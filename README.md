@@ -53,6 +53,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.17:** the left bar can be closed to icons only (the ☰ button) and opens again the same way; Frameout remembers your choice.
+
 **1.0.16:** the home screen has a tab bar on the left: Home, Templates and Settings.
 
 **1.0.15:** a home screen with your recent designs and a size picker for new ones (phone, tablet, PC, Instagram and more). Duplicate, copy and delete now take everything inside a frame with them, and a copied screen is placed beside the original. Auto layout works with frames inside frames.
