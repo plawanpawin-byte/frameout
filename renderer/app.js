@@ -102,7 +102,7 @@ app.append(toolbar, h('div', { class: 'main', style: 'flex:1;min-height:0;min-wi
 const btn = (label, fn, cls = '') => h('button', { class: 'btn ' + cls, onclick: fn, text: label });
 const toolBtns = {};
 const TOOLS = [['select', 'Move'], ['frame', 'Frame'], ['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['line', 'Line'], ['text', 'Text']];
-toolbar.append(btn('Home', () => showHome()), btn('New', newDoc), btn('Open', openDoc), btn('Save', saveDoc, 'primary'), h('span', { class: 'sep' }));
+toolbar.append(btn('Home', () => showHome('home')), btn('New', newDoc), btn('Open', openDoc), btn('Save', saveDoc, 'primary'), h('span', { class: 'sep' }));
 TOOLS.forEach(([k, label]) => { const b = btn(label, () => setTool(k)); toolBtns[k] = b; toolbar.append(b); });
 toolbar.append(h('span', { class: 'sep' }), btn('Undo', undo), btn('Redo', redo), btn('Duplicate', dupe), btn('Delete', del), h('span', { class: 'sep' }),
   btn('-', () => zoomBy(1 / 1.2), 'icon'), btn('+', () => zoomBy(1.2), 'icon'), btn('Fit', fit), h('span', { class: 'grow' }),
@@ -434,9 +434,13 @@ function autosave() {
   let svgStr = ''; try { const fr = doc.items.find((i) => i.type === 'frame' && !i.hidden); const r = exportSvgString(fr || null); svgStr = r ? r.str : ''; } catch (e) { /* no picture */ }
   const list = readRecent().filter((e) => e.id !== doc.id);
   list.unshift({ id: doc.id, title: doc.title || 'Untitled design', time: Date.now(), svg: svgStr, doc: s });
-  writeRecent(list.slice(0, 12));
+  writeRecent(list.slice(0, getSet('recentMax')));
 }
-function showHome() { autosave(); homeOpen = true; home.style.display = 'block'; renderHome(); }
+const SET_KEY = 'frameout.settings', SET_DEF = { recentMax: 12, openOn: 'home' };
+function getSet(k) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); const v = s && s[k]; if (k === 'recentMax') return [6, 12, 24].includes(v) ? v : SET_DEF[k]; if (k === 'openOn') return v === 'last' ? 'last' : 'home'; } catch (e) { /* defaults */ } return SET_DEF[k]; }
+function putSet(k, v) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {}; s[k] = v; localStorage.setItem(SET_KEY, JSON.stringify(s)); } catch (e) { /* not saved */ } }
+let homeTab = 'home';
+function showHome(tab) { autosave(); homeOpen = true; if (tab) homeTab = tab; home.style.display = 'flex'; renderHome(); }
 function closeHome() { homeOpen = false; home.style.display = 'none'; }
 function startDesign(d) { autosave(); doc = d; sel.clear(); undoS = []; redoS = []; fileName = ''; savedSnap = snapshot(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
 function openRecent(e) {
@@ -446,23 +450,63 @@ function openRecent(e) {
 function removeRecent(id) { writeRecent(readRecent().filter((e) => e.id !== id)); renderHome(); }
 function ago(t) { const d = new Date(t), now = new Date(); const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); const diff = Math.round((day(now) - day(d)) / 86400000); const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); return diff <= 0 ? 'Today ' + hm : diff === 1 ? 'Yesterday ' + hm : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); }
 function thumbBox(svgStr, cls = '') { const box = h('div', { class: 'thumb ' + cls }); if (svgStr) box.append(h('img', { src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr), alt: '' })); else box.append(h('span', { class: 'muted', text: 'Empty' })); return box; }
-function renderHome() {
-  home.textContent = '';
+// starter templates, built in code so they stay small and work offline
+const TEMPLATES = [
+  ['Mobile app', 'Two linked screens with a button', () => sampleDoc()],
+  ['Login screen', 'Phone, two fields and a button', () => tpl('Login screen', [['frame', 0, 0, 393, 852, { name: 'Login', fill: '#ffffff' }], ['text', 32, 120, 300, 44, { text: 'Welcome back', fs: 32, fill: '#1a1a1a' }], ['text', 32, 172, 320, 24, { text: 'Sign in to continue', fs: 16, fill: '#6b6b6b' }], ['rect', 32, 260, 329, 52, { name: 'Email field', fill: '#f0f0f0', r: 12 }], ['text', 48, 274, 200, 24, { text: 'Email', fs: 16, fill: '#8a8a8a' }], ['rect', 32, 328, 329, 52, { name: 'Password field', fill: '#f0f0f0', r: 12 }], ['text', 48, 342, 200, 24, { text: 'Password', fs: 16, fill: '#8a8a8a' }], ['rect', 32, 412, 329, 52, { name: 'Button', fill: '#262626', r: 26 }], ['text', 150, 426, 100, 24, { text: 'Sign in', fs: 16, fill: '#ffffff' }]])],
+  ['Landing page', 'Desktop page with a hero and three cards', () => tpl('Landing page', [['frame', 0, 0, 1440, 1024, { name: 'Landing', fill: '#ffffff' }], ['rect', 0, 0, 1440, 72, { name: 'Nav', fill: '#f4f4f4' }], ['text', 64, 22, 160, 28, { text: 'Brand', fs: 22, fill: '#1a1a1a' }], ['text', 220, 150, 1000, 80, { text: 'A clear headline goes here', fs: 64, fill: '#1a1a1a' }], ['text', 360, 250, 720, 60, { text: 'One or two lines that explain what this is and who it is for.', fs: 20, fill: '#6b6b6b' }], ['rect', 600, 340, 240, 56, { name: 'Button', fill: '#262626', r: 28 }], ['text', 668, 356, 120, 24, { text: 'Get started', fs: 18, fill: '#ffffff' }], ['rect', 120, 520, 360, 320, { name: 'Card', fill: '#ececec', r: 20 }], ['rect', 540, 520, 360, 320, { name: 'Card', fill: '#ececec', r: 20 }], ['rect', 960, 520, 360, 320, { name: 'Card', fill: '#ececec', r: 20 }]])],
+  ['Dashboard', 'Wireframe with sidebar, stats and a chart', () => tpl('Dashboard', [['frame', 0, 0, 1280, 800, { name: 'Dashboard', fill: '#f6f6f6' }], ['rect', 0, 0, 220, 800, { name: 'Sidebar', fill: '#262626' }], ['text', 28, 28, 160, 28, { text: 'Dashboard', fs: 20, fill: '#ffffff' }], ['rect', 260, 40, 230, 110, { name: 'Stat', fill: '#ffffff', r: 14 }], ['rect', 515, 40, 230, 110, { name: 'Stat', fill: '#ffffff', r: 14 }], ['rect', 770, 40, 230, 110, { name: 'Stat', fill: '#ffffff', r: 14 }], ['rect', 1025, 40, 230, 110, { name: 'Stat', fill: '#ffffff', r: 14 }], ['rect', 260, 180, 995, 360, { name: 'Chart', fill: '#ffffff', r: 14 }], ['rect', 260, 570, 995, 190, { name: 'Table', fill: '#ffffff', r: 14 }]])],
+  ['Instagram quote', 'Square post with big text', () => tpl('Instagram quote', [['frame', 0, 0, 1080, 1080, { name: 'Post', fill: '#262626' }], ['text', 120, 380, 840, 240, { text: 'Write your quote here.', fs: 72, fill: '#ffffff' }], ['text', 120, 940, 400, 36, { text: '@yourname', fs: 28, fill: '#a0a0a0' }]])],
+  ['Slide 16:9', 'Title slide, 1920 by 1080', () => tpl('Slide', [['frame', 0, 0, 1920, 1080, { name: 'Slide', fill: '#ffffff' }], ['text', 160, 380, 1400, 120, { text: 'Slide title', fs: 96, fill: '#1a1a1a' }], ['text', 160, 530, 1200, 50, { text: 'Subtitle or speaker', fs: 36, fill: '#6b6b6b' }]])],
+];
+function tpl(title, specs) {
+  const keep = doc; doc = { id: uid(), title, items: [] };
+  for (const [type, x, y, w, hh, p] of specs) { const it = makeItem(type, x, y, w, hh); Object.assign(it, p); if (type === 'text') { it.w = w; it.h = hh; if (!it.name) it.name = it.text; } doc.items.push(it); }
+  const out = doc; doc = keep; return out;
+}
+function docThumb(d) { const keep = doc; let s = ''; try { doc = d; const fr = d.items.find((i) => i.type === 'frame'); const r = exportSvgString(fr || null); s = r ? r.str : ''; } catch (e) { /* no picture */ } doc = keep; return s; }
+function newCard(icon, name, sub, fn) { return h('button', { class: 'hcard', onclick: fn }, h('div', { class: 'thumb plus' }, h('span', { text: icon })), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })); }
+function homeHome() {
   const recent = readRecent();
-  const start = h('div', { class: 'home-row' },
-    h('button', { class: 'hcard hnew', onclick: showSizePicker }, h('div', { class: 'thumb plus' }, h('span', { text: '+' })), h('div', { class: 'hname', text: 'New design' }), h('div', { class: 'hsub', text: 'Pick a size: phone, desktop, social, canvas' })),
-    h('button', { class: 'hcard', onclick: () => openDoc() }, h('div', { class: 'thumb plus' }, h('span', { text: '\u2191' })), h('div', { class: 'hname', text: 'Open file' }), h('div', { class: 'hsub', text: 'A .frameout file from your computer' })),
-    h('button', { class: 'hcard', onclick: () => startDesign(sampleDoc()) }, h('div', { class: 'thumb plus' }, h('span', { text: '\u25A3' })), h('div', { class: 'hname', text: 'Example' }), h('div', { class: 'hsub', text: 'Two linked mobile screens to explore' })));
   const grid = h('div', { class: 'home-grid' });
   for (const e of recent) {
     grid.append(h('div', { class: 'hcard', tabindex: 0, role: 'button', onclick: () => openRecent(e), onkeydown: (ev) => { if (ev.key === 'Enter') openRecent(e); } },
       thumbBox(e.svg), h('div', { class: 'hname', text: e.title || 'Untitled design' }), h('div', { class: 'hsub', text: 'Edited ' + ago(e.time) }),
       h('button', { class: 'btn hrm', title: 'Remove from recent', onclick: (ev) => { ev.stopPropagation(); removeRecent(e.id); }, text: 'Remove' })));
   }
-  home.append(h('div', { class: 'home-in' },
-    h('div', { class: 'home-head' }, h('img', { src: 'logo.png', width: 32, height: 32, alt: '', onerror: (e) => e.target.remove() }), h('h1', { text: 'Frameout' }), h('span', { class: 'grow' }), session ? btn('Back to design', closeHome) : h('span'), btn('New design', showSizePicker, 'primary')),
-    h('h2', { text: 'Start' }), start,
-    h('h2', { text: 'Recent' }), recent.length ? grid : h('div', { class: 'muted', style: 'padding:8px 2px', text: 'Designs you work on appear here, with a small picture, and are kept on this computer.' })));
+  return [h('h2', { text: 'Start' }), h('div', { class: 'home-row' },
+    newCard('+', 'New design', 'Pick a size: phone, desktop, social, canvas', showSizePicker),
+    newCard('↑', 'Open file', 'A .frameout file from your computer', () => openDoc()),
+    newCard('▣', 'Example', 'Two linked mobile screens to explore', () => startDesign(sampleDoc()))),
+  h('h2', { text: 'Recent' }), recent.length ? grid : h('div', { class: 'muted', style: 'padding:8px 2px', text: 'Designs you work on appear here, with a small picture, and are kept on this computer.' })];
+}
+function homeTemplates() {
+  const grid = h('div', { class: 'home-grid' });
+  for (const [name, sub, make] of TEMPLATES) grid.append(h('button', { class: 'hcard', onclick: () => startDesign(make()) }, thumbBox(docThumb(make())), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })));
+  return [h('div', { class: 'muted', style: 'margin:-6px 2px 12px', text: 'Start from a ready layout. Everything in it can be edited.' }), grid];
+}
+function homeSettings() {
+  const row = (label, sub, ctl) => h('div', { class: 'srow' }, h('div', {}, h('div', { text: label }), h('div', { class: 'hsub', text: sub })), h('span', { class: 'grow' }), ctl);
+  const pick = (opts, cur, fn) => h('div', { class: 'seg' }, opts.map(([v, t]) => h('button', { class: 'btn' + (v === cur ? ' primary' : ''), text: t, onclick: () => { fn(v); renderHome(); } })));
+  let bytes = 0; try { bytes = (localStorage.getItem(RECENT_KEY) || '').length; } catch (e) { /* unknown */ }
+  const mb = bytes > 1e6 ? (bytes / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1000)) + ' KB';
+  return [h('div', { class: 'settings' },
+    row('When Frameout opens', 'Show this home screen, or jump back into the design you edited last.', pick([['home', 'Home'], ['last', 'Last design']], getSet('openOn'), (v) => putSet('openOn', v))),
+    row('Recent designs to keep', 'More designs use more space on this computer. Older ones drop off first.', pick([[6, '6'], [12, '12'], [24, '24']], getSet('recentMax'), (v) => { putSet('recentMax', v); writeRecent(readRecent().slice(0, v)); })),
+    row('Space used by Recent', mb + ' on this computer. Saved .frameout files are not affected.', btn('Clear recent', () => { if (!readRecent().length) return; if (confirm('Remove all designs from Recent? Files you saved are not touched.')) { writeRecent([]); renderHome(); toast('Recent cleared'); } })),
+    row('Privacy', 'Frameout never connects to the internet. Your designs stay on this computer.', h('span')),
+    row('About', 'Frameout, part of the Lookout apps. Works fully offline.', h('span')))];
+}
+function renderHome() {
+  home.textContent = '';
+  const tabs = [['home', 'Home', '⌂'], ['templates', 'Templates', '▦'], ['settings', 'Settings', '⚙']];
+  const side = h('nav', { class: 'home-side' },
+    h('div', { class: 'home-logo' }, h('img', { src: 'logo.png', width: 28, height: 28, alt: '', onerror: (e) => e.target.remove() }), h('span', { text: 'Frameout' })),
+    tabs.map(([id, name, ic]) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic', text: ic }), h('span', { text: name }))),
+    h('span', { class: 'grow' }), session ? h('button', { class: 'htab', onclick: closeHome }, h('span', { class: 'hic', text: '←' }), h('span', { text: 'Back to design' })) : h('span'));
+  const body = homeTab === 'templates' ? homeTemplates() : homeTab === 'settings' ? homeSettings() : homeHome();
+  home.append(side, h('div', { class: 'home-main' }, h('div', { class: 'home-in' },
+    h('div', { class: 'home-head' }, h('h1', { text: homeTab === 'templates' ? 'Templates' : homeTab === 'settings' ? 'Settings' : 'Home' }), h('span', { class: 'grow' }), btn('New design', showSizePicker, 'primary')), ...body)));
 }
 const SIZES = [
   ['Phone', [['iPhone', 393, 852], ['Android', 360, 800], ['Small phone', 320, 568]]],
@@ -497,6 +541,7 @@ function showSizePicker() {
 }
 setInterval(autosave, 3000); window.addEventListener('pagehide', autosave);
 setTool('select'); render(); showHome();
+if (getSet('openOn') === 'last') { const r = readRecent()[0]; if (r) openRecent(r); }
 window.addEventListener('resize', () => applyView());
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', async (e) => {

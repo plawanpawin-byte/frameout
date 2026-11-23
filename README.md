@@ -34,6 +34,9 @@ Then comes the part that makes it a prototype: you can **link a shape to another
 
 Frameout opens on a home screen. **Recent** shows the designs you worked on, each with a small picture of its first screen, its name and when you last edited it. Click one to carry on. Your work is kept automatically on this computer, so you do not have to save a file to find it again. Use **Remove** on a card to take it off the list.
 
+A bar on the left switches between three tabs. **Home** has Start and Recent. **Templates** has ready layouts to start from: mobile app, login screen, landing page, dashboard, Instagram quote and a 16:9 slide. **Settings** lets you choose whether Frameout opens on Home or on your last design, how many recent designs to keep (6, 12 or 24), and clear the Recent list.
+
+
 ![Home screen](screenshots/06-home.png)
 
 Choose **New design** and pick a size for your first frame: phone, tablet, desktop (PC), Instagram post, portrait or story, YouTube thumbnail, Facebook cover, a blank canvas without a frame, or your own width and height.
@@ -49,6 +52,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 3. Press **Preview** and click through your screens, then export one as an image.
 
 ## What is new
+
+**1.0.16:** the home screen has a tab bar on the left: Home, Templates and Settings.
 
 **1.0.15:** a home screen with your recent designs and a size picker for new ones (phone, tablet, PC, Instagram and more). Duplicate, copy and delete now take everything inside a frame with them, and a copied screen is placed beside the original. Auto layout works with frames inside frames.
 
@@ -71,6 +76,9 @@ Then comes the part that makes it a prototype: you can **link a shape to another
 ## The home screen
 
 Frameout opens on a home screen. **Recent** shows the designs you worked on, each with a small picture of its first screen, its name and when you last edited it. Click one to carry on. Your work is kept automatically on this computer, so you do not have to save a file to find it again. Use **Remove** on a card to take it off the list.
+
+A bar on the left switches between three tabs. **Home** has Start and Recent. **Templates** has ready layouts to start from: mobile app, login screen, landing page, dashboard, Instagram quote and a 16:9 slide. **Settings** lets you choose whether Frameout opens on Home or on your last design, how many recent designs to keep (6, 12 or 24), and clear the Recent list.
+
 
 ![Home screen](screenshots/06-home.png)
 
