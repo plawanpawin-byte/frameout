@@ -45,3 +45,7 @@
 .hbar{color:var(--text-2)}
 .tbtitle{width:200px;height:30px;padding:0 12px;border-radius:15px;border:1px solid transparent;background:var(--bg-3);color:var(--text);font:inherit;font-size:13px;text-align:center}
 .tbtitle:focus{border-color:var(--accent);outline:0}
+.dock{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:5;display:flex;gap:4px;padding:6px;background:var(--bg-2);border:1px solid var(--bg-4);border-radius:18px;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.dk{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:0;border-radius:13px;background:transparent;color:var(--text-2);cursor:pointer}
+.dk:hover{background:var(--bg-3);color:var(--text)}
+.dk.on{background:var(--accent);color:var(--accent-ink)}

@@ -115,10 +115,26 @@ const toolBtns = {};
 const TOOLS = [['select', 'Move'], ['frame', 'Frame'], ['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['line', 'Line'], ['text', 'Text']];
 const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', oninput: (e) => { doc.title = e.target.value; }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); } });
 toolbar.append(btn('Home', () => showHome('home')), btn('New', newDoc), btn('Open', openDoc), btn('Save', saveDoc, 'primary'), h('span', { class: 'sep' }));
-TOOLS.forEach(([k, label]) => { const b = btn(label, () => setTool(k)); toolBtns[k] = b; toolbar.append(b); });
-toolbar.append(h('span', { class: 'sep' }), btn('Undo', undo), btn('Redo', redo), btn('Duplicate', dupe), btn('Delete', del), h('span', { class: 'sep' }),
+toolbar.append(btn('Undo', undo), btn('Redo', redo), btn('Duplicate', dupe), btn('Delete', del), h('span', { class: 'sep' }),
   btn('-', () => zoomBy(1 / 1.2), 'icon'), btn('+', () => zoomBy(1.2), 'icon'), btn('Fit', fit), h('span', { class: 'grow' }), titleInput,
   btn('Preview', startPreview), btn('Export PNG', () => exportImg('png')), btn('Export SVG', () => exportImg('svg')));
+// floating tool dock at the bottom of the canvas, like Figma
+const TOOL_ICONS = {
+  select: '<path d="M5 3l14 7-6 2-2 6z"/>',
+  frame: '<path d="M7 3v18M17 3v18M3 7h18M3 17h18"/>',
+  rect: '<rect x="4" y="5" width="16" height="14" rx="2"/>',
+  ellipse: '<circle cx="12" cy="12" r="8"/>',
+  line: '<path d="M5 19L19 5"/>',
+  text: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
+};
+const dock = h('div', { class: 'dock', role: 'toolbar', 'aria-label': 'Tools' });
+for (const [k, label, key] of [['select', 'Move', 'V'], ['frame', 'Frame', 'F'], ['rect', 'Rectangle', 'R'], ['ellipse', 'Ellipse', 'O'], ['line', 'Line', 'L'], ['text', 'Text', 'T']]) {
+  const ico = sv('svg', { viewBox: '0 0 24 24', width: 26, height: 26, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' });
+  for (const n of [...new DOMParser().parseFromString('<svg xmlns="' + NS + '">' + TOOL_ICONS[k] + '</svg>', 'image/svg+xml').documentElement.childNodes]) ico.append(document.importNode(n, true));
+  const b = h('button', { class: 'dk', title: label + ' (' + key + ')', 'aria-label': label, onclick: () => setTool(k) }, ico);
+  toolBtns[k] = b; dock.append(b);
+}
+stage.append(dock);
 function setTool(t) { tool = t; for (const k in toolBtns) toolBtns[k].classList.toggle('on', k === t); svg.style.cursor = t === 'select' ? 'default' : 'crosshair'; }
 
 const svg = sv('svg', { width: '100%', height: '100%', style: 'display:block;touch-action:none;background:#1c1c1c' });
