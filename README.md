@@ -65,6 +65,18 @@ In **Templates**, **My templates** lets you upload your own `.frameout` project.
 
 ![My templates](screenshots/12-my-templates.png)
 
+### Pictures, rotation, gradients, shadows and text styles
+
+- **Images:** press the picture button in the bottom bar (or Shift+I) and choose PNG, JPG, WebP or GIF files. They are shrunk to keep the design small and stored inside the `.frameout` file. Pictures can have rounded corners, a shadow and rotation like any other layer.
+- **Rotation:** type degrees in the Rotation box in the right panel.
+- **Gradient:** tick *Fade to a second color*, pick the second color and an angle (90 is top to bottom).
+- **Shadow:** tick *Drop shadow* and set X, Y, blur and strength.
+- **Text:** choose a font (sans-serif, serif or monospace), Bold, and Left, Center or Right alignment. After you place a text layer you can type at once; double-click a text layer to edit it.
+
+Gradients, shadows, rotation and pictures all appear in PNG and SVG exports. Frames cannot be rotated, and a rotated layer can be moved but not resized with the handles (set its width and height in the panel instead).
+
+![Gradient, shadow, rotation, picture and text styles](screenshots/13-styles.png)
+
 Press **Home** in the top bar at any time to come back to this screen. Your design is saved to Recent first.
 
 ## Try it in 3 steps
@@ -74,6 +86,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 3. Press **Preview** and click through your screens, then export one as an image.
 
 ## What is new
+
+**1.0.25:** pictures, rotation, gradients, drop shadows and text styles (font, bold, alignment).
 
 **1.0.24:** folders on your computer in the left bar, and your own projects as templates.
 
