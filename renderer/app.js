@@ -465,7 +465,7 @@ function renderRight() {
     const ta = h('textarea', { rows: 3, style: 'width:100%' }); ta.value = i.text; ta.addEventListener('input', commit, { once: true }); ta.addEventListener('input', () => { i.text = ta.value; if (i.instOf || i.inst) i.ov = true; const lines = ta.value.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; if ((i.ta || 'left') === 'left') i.w = Math.max(40, Math.max(...lines.map((l) => l.length)) * i.fs * 0.55); renderItemsOnly(); });
     right.append(h('h3', { text: 'Text' }), ta, num('Font size', 'fs'));
     if (focusText) { focusText = false; setTimeout(() => { const t = right.querySelector('textarea'); if (t) { t.focus(); t.select(); } }, 80); }
-    right.lastChild.querySelector('input').addEventListener('change', () => { const lines = i.text.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; render(); });
+    right.lastChild.querySelector('input').addEventListener('change', () => { for (const it of items) { if (it.type !== 'text') continue; const lines = it.text.split('\n'); it.h = lines.length * it.fs * 1.25 + 4; if ((it.ta || 'left') === 'left') it.w = Math.max(40, Math.max(...lines.map((l) => l.length)) * it.fs * 0.55); } render(); });
     right.append(h('h3', { text: 'Font' }), h('select', { style: 'width:100%', 'aria-label': 'Font', onchange: (e) => { commit(); items.forEach((it) => { it.ff = e.target.value; }); render(); } }, [['sans', 'Sans-serif'], ['serif', 'Serif'], ['mono', 'Monospace']].map(([v, t]) => h('option', { value: v, text: t, selected: (i.ff || 'sans') === v }))),
       h('div', { style: 'display:flex;gap:4px;margin-top:6px;flex-wrap:wrap' }, h('button', { class: 'btn' + (i.fw === 700 ? ' primary' : ''), text: 'Bold', onclick: () => { commit(); const on = i.fw !== 700; items.forEach((it) => { it.fw = on ? 700 : 400; }); render(); } }),
         h('span', { class: 'muted', style: 'align-self:center;margin:0 2px', text: 'Align' }), [['left', 'Left'], ['center', 'Center'], ['right', 'Right']].map(([v, t]) => h('button', { class: 'btn' + ((i.ta || 'left') === v ? ' primary' : ''), text: t, onclick: () => { commit(); items.forEach((it) => { it.ta = v; }); render(); } }))));
@@ -483,8 +483,8 @@ function renderRight() {
     right.append(h('h3', { text: 'Auto layout' }),
       h('select', { style: 'width:100%', onchange: (e) => set({ dir: e.target.value }) }, ...[['', 'Off'], ['v', 'Vertical stack'], ['h', 'Horizontal stack']].map(([v, t]) => h('option', { value: v, text: t, selected: (al.dir || '') === v }))));
     if (al.dir) right.append(h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:6px' },
-      h('label', { class: 'field' }, 'Gap', h('input', { type: 'number', value: al.gap, style: 'width:100%', onchange: (e) => set({ gap: Math.max(0, +e.target.value || 0) }) })),
-      h('label', { class: 'field' }, 'Padding', h('input', { type: 'number', value: al.pad, style: 'width:100%', onchange: (e) => set({ pad: Math.max(0, +e.target.value || 0) }) }))),
+      h('label', { class: 'field' }, 'Gap', h('input', { type: 'number', value: al.gap, style: 'width:100%', onchange: (e) => set({ gap: clamp(+e.target.value || 0, 0, 10000) }) })),
+      h('label', { class: 'field' }, 'Padding', h('input', { type: 'number', value: al.pad, style: 'width:100%', onchange: (e) => set({ pad: clamp(+e.target.value || 0, 0, 10000) }) }))),
       h('select', { style: 'width:100%', onchange: (e) => set({ align: e.target.value }) }, ...[['start', 'Align start'], ['center', 'Align center'], ['end', 'Align end']].map(([v, t]) => h('option', { value: v, text: t, selected: al.align === v }))),
       h('label', { class: 'field', style: 'flex-direction:row;gap:6px;align-items:center' }, h('input', { type: 'checkbox', checked: !!al.hug, onchange: (e) => set({ hug: e.target.checked }) }), 'Hug contents'));
   }
@@ -629,11 +629,21 @@ function renderDev() {
 }
 
 // ---------- actions ----------
+// a layer inside a frame always draws after (on top of) that frame, or the frame's fill would hide it
+function parentsFirst(list) {
+  const out = [], placed = new Set(), wait = new Map();
+  const put = (i) => { out.push(i); placed.add(i.id); const w = wait.get(i.id); if (w) { wait.delete(i.id); w.forEach(put); } };
+  for (const i of list) { const pf = parentFrame(i); if (pf && !placed.has(pf.id)) { if (!wait.has(pf.id)) wait.set(pf.id, []); wait.get(pf.id).push(i); } else put(i); }
+  for (const w of wait.values()) w.forEach(put);
+  return out;
+}
 function order(how) {
-  const ids = doc.items.filter((i) => sel.has(i.id)); if (!ids.length) return; commit();
-  const rest = doc.items.filter((i) => !sel.has(i.id));
+  const blk = expand(sel);   // a frame moves together with everything inside it
+  const ids = doc.items.filter((i) => blk.has(i.id)); if (!ids.length) return; const before = doc.items.map((i) => i.id).join(); commit();
+  const rest = doc.items.filter((i) => !blk.has(i.id));
   if (how === 'front') doc.items = [...rest, ...ids]; else if (how === 'back') doc.items = [...ids, ...rest];
   else { const idx = doc.items.indexOf(ids[0]); const t = clamp(idx + (how === 'up' ? 1 : -1), 0, doc.items.length - ids.length); doc.items = rest; doc.items.splice(t, 0, ...ids); }
+  doc.items = parentsFirst(doc.items); if (doc.items.map((i) => i.id).join() === before) undoS.pop();
   render();
 }
 function align(a) {
@@ -643,7 +653,9 @@ function align(a) {
   render();
 }
 function del() {
-  if (!sel.size) return; commit(); const ids = expand(sel);
+  if (!sel.size) return; const own = new Set([...sel].filter((id) => { const x = get(id); return x && !x.instOf; }));
+  if (!own.size) { toast('Parts of an instance follow the main component. Detach the instance to delete them.'); return; }
+  commit(); const ids = expand(own);
   for (const id of ids) { const x = get(id); if (x && x.master) for (const c of doc.items.filter((y) => y.inst === id)) detach(c.id); if (x && x.inst) doc.items = doc.items.filter((y) => y.instRoot !== id); }
   doc.items = doc.items.filter((i) => !ids.has(i.id)); for (const i of doc.items) if (ids.has(i.go)) i.go = '';
   if (doc.motion) for (const id of Object.keys(doc.motion.tracks)) if (!get(id)) delete doc.motion.tracks[id];
