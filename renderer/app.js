@@ -431,7 +431,16 @@ const TIPS = {
   draw: 'Pick the pen, pencil or a shape, then draw on the canvas.\nPen: click to add points, click the first point to close the shape, press Enter to finish.\nScroll to pan, Ctrl+scroll to zoom, hold Space to pan.',
   motion: 'Click a layer to animate it.\nPut the playhead on a time and press Add keyframe. Move the playhead, change the layer and add another keyframe.\nTurn on Auto keyframe to record changes by themselves, then press Play.',
 };
+// a number field changed from the keyboard (arrow keys or Enter) keeps the focus when the panel is rebuilt
+let keyNum = null;
+right.addEventListener('keydown', (e) => { if (e.target.matches('input[type=number]') && /^(Enter|ArrowUp|ArrowDown)$/.test(e.key)) { keyNum = e.target; setTimeout(() => { keyNum = null; }, 0); } }, true);
 function renderRight() {
+  const a = document.activeElement, all = () => [...right.querySelectorAll('input[type=number]')];
+  const keep = a && a === keyNum ? { n: all().indexOf(a), l: (a.closest('label') || {}).textContent } : null;
+  buildRight();
+  if (keep) { const el = all()[keep.n]; if (el && (el.closest('label') || {}).textContent === keep.l) el.focus(); }
+}
+function buildRight() {
   right.textContent = '';
   if (mode === 'dev') { right.append(phead('Code', 'right')); renderDev(); return; }
   right.append(phead(mode === 'motion' ? 'Motion' : 'Design', 'right'), h('label', { class: 'field' }, 'Title', h('input', { type: 'text', class: 'rtitle', maxlength: 80, value: doc.title, oninput: (e) => { doc.title = e.target.value; titleInput.value = doc.title; }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; titleInput.value = doc.title; } } })));
@@ -812,7 +821,8 @@ document.addEventListener('keydown', (e) => {
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && fly.contains(e.target)) { e.preventDefault(); fly.classList.add('kb'); const it = [...fly.querySelectorAll('.fi')], i = it.indexOf(e.target); it[(i + (e.key === 'ArrowDown' ? 1 : it.length - 1)) % it.length].focus(); return; }
   }
   if (e.target.matches('input,textarea,select')) return;
-  if (document.querySelector('.modal-back') || (!e.ctrlKey && !e.metaKey && e.target.matches('button,[contenteditable]'))) return;
+  // a focused button keeps Space and Enter (they press it); other shortcuts still work after clicking one
+  if (document.querySelector('.modal-back') || (!e.ctrlKey && !e.metaKey && (e.target.matches('[contenteditable]') || (e.target.matches('button') && (e.key === 'Enter' || e.code === 'Space'))))) return;
   const k = e.key.toLowerCase();
   if (mode === 'dev' && ((e.ctrlKey && (k === 'd' || k === 'v')) || e.key === 'Delete' || e.key === 'Backspace' || e.key.startsWith('Arrow'))) return;
   if (e.code === 'Space') { spaceDown = true; e.preventDefault(); }
