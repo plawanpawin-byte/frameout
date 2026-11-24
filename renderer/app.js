@@ -146,7 +146,8 @@ function tbtn(label, ic, fn, cls = '', tip = label) {
   const b = h('button', { class: 'btn ' + cls, onclick: fn, title: tip, 'aria-label': label });
   const i = icon(ic, 20); i.classList.add('ic'); i.dataset.for = label; b.append(i, document.createTextNode(label)); return b;
 }
-const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', oninput: (e) => { doc.title = e.target.value; }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); } });
+const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', onfocus: (e) => { e.target.dataset.old = doc.title || ''; }, oninput: (e) => { doc.title = e.target.value; syncTitle(); }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; syncTitle(); } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { doc.title = e.target.dataset.old || doc.title; e.target.value = doc.title; syncTitle(); e.target.blur(); } } });
+function syncTitle() { const r = document.querySelector('.rtitle'); if (r && r !== document.activeElement) r.value = doc.title; }
 const exportBtn = tbtn('Export', 'download', (e) => openMenu(e.currentTarget, 'export', [['image', 'Export PNG', () => exportImg('png')], ['code', 'Export SVG', () => exportImg('svg')]], e.detail === 0));
 exportBtn.dataset.menu = 'export'; exportBtn.setAttribute('aria-haspopup', 'menu');
 toolbar.append(tbtn('Home', 'home', () => showHome('home'), '', 'Home (all designs)'), titleInput, h('span', { class: 'grow' }),
@@ -414,6 +415,14 @@ function renderLeft() {
   if (!masters.length) left.append(h('div', { class: 'muted', style: 'padding:4px 8px;font-size:12px', text: 'Select a layer and press Create component.' }));
   for (const m of masters) left.append(h('div', { class: 'item', style: 'display:flex;gap:4px;align-items:center;padding:3px 6px' }, h('span', { class: 'grow', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: '\u25C6 ' + m.name }), btn('Insert', () => insertInstance(m))));
 }
+// a number typed in the right panel: empty or not a number puts the old value back (returns null)
+function numIn(el, old, round) { const raw = String(el.value).trim(), v = +raw; if (raw === '' || !Number.isFinite(v)) { el.value = Math.round(old * round) / round; return null; } return v; }
+// keep panel numbers in a range that draws: sizes at least 1 (a line may point any way), no negative stroke or corners
+function fitNum(key, v, it) {
+  if (key === 'w' || key === 'h') return it.type === 'line' ? clamp(v, -1e5, 1e5) : clamp(v, 1, 1e5);
+  if (key === 'sw') return clamp(v, 0, 500); if (key === 'r') return clamp(v, 0, 1e5); if (key === 'fs') return clamp(v, 6, 400);
+  return clamp(v, -1e6, 1e6);
+}
 const TIPS = {
   design: 'Pick a tool or press its letter, then drag on the canvas.\nShift-click to select several.\nScroll to pan, Ctrl+scroll to zoom, hold Space to pan.\nGive a shape a Link to a frame, then press Preview to click through your prototype.',
   draw: 'Pick the pen, pencil or a shape, then draw on the canvas.\nPen: click to add points, click the first point to close the shape, press Enter to finish.\nScroll to pan, Ctrl+scroll to zoom, hold Space to pan.',
@@ -422,13 +431,13 @@ const TIPS = {
 function renderRight() {
   right.textContent = '';
   if (mode === 'dev') { right.append(phead('Code', 'right')); renderDev(); return; }
-  right.append(phead(mode === 'motion' ? 'Motion' : 'Design', 'right'), h('label', { class: 'field' }, 'Title', h('input', { type: 'text', value: doc.title, oninput: (e) => { doc.title = e.target.value; } })));
+  right.append(phead(mode === 'motion' ? 'Motion' : 'Design', 'right'), h('label', { class: 'field' }, 'Title', h('input', { type: 'text', class: 'rtitle', maxlength: 80, value: doc.title, oninput: (e) => { doc.title = e.target.value; titleInput.value = doc.title; }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; titleInput.value = doc.title; } } })));
   const items = [...sel].map(get).filter(Boolean); if (!items.length) { right.append(h('h3', { text: 'Tips' }), h('div', { class: 'muted', style: 'font-size:12px;line-height:1.6;white-space:pre-line', text: TIPS[mode] || TIPS.design })); return; }
   const i = items[0];
   let nameUndo = false;
-  const num = (label, key) => h('label', { class: 'field' }, label, h('input', { type: 'number', value: Math.round(i[key] * 10) / 10, style: 'width:100%', onchange: (e) => { const v = +e.target.value; if (!isNaN(v)) { commit(); items.forEach((it) => { if (['w', 'h'].includes(key)) it[key] = Math.max(1, v); else it[key] = v; }); autoKeyFor(items); render(); } } }));
+  const num = (label, key) => h('label', { class: 'field' }, label, h('input', { type: 'number', value: Math.round(i[key] * 10) / 10, style: 'width:100%', onchange: (e) => { const v = numIn(e.target, i[key], 10); if (v === null) return; commit(); items.forEach((it) => { it[key] = fitNum(key, v, it); }); autoKeyFor(items); render(); } }));
   right.append(h('h3', { text: 'Layout' }), h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:6px' }, num('X', 'x'), num('Y', 'y'), num('W', 'w'), num('H', 'h')));
-  right.append(h('label', { class: 'field' }, 'Name', h('input', { type: 'text', value: i.name, oninput: (e) => { if (!nameUndo) { commit(); nameUndo = true; } i.name = e.target.value; renderLeft(); } })));
+  right.append(h('label', { class: 'field' }, 'Name', h('input', { type: 'text', value: i.name, oninput: (e) => { if (!nameUndo) { commit(); nameUndo = true; } i.name = e.target.value; renderLeft(); }, onchange: (e) => { if (!e.target.value.trim()) { i.name = NAMES[i.type] || 'Layer'; e.target.value = i.name; renderLeft(); render(); } } })));
   if (i.type !== 'line') {
     right.append(h('h3', { text: i.type === 'text' ? 'Text color' : 'Fill' }), h('div', { class: 'swatches' }, FILLS.map((c) => h('button', { style: `background:${c}`, onclick: () => { commit(); items.forEach((it) => { it.fill = c; }); render(); } }))));
   }
@@ -437,7 +446,7 @@ function renderRight() {
   const op = h('input', { type: 'range', min: 5, max: 100, value: Math.round(i.op * 100), oninput: () => { items.forEach((it) => (it.op = op.value / 100)); renderItemsOnly(); } }); op.addEventListener('pointerdown', commit); op.addEventListener('change', () => { autoKeyFor(items); render(); });
   right.append(h('h3', { text: 'Opacity' }), op);
   const chk = (label, on, fn) => h('label', { class: 'field', style: 'flex-direction:row;gap:6px;align-items:center' }, h('input', { type: 'checkbox', checked: !!on, onchange: (e) => { commit(); fn(e.target.checked); render(); } }), label);
-  const numTo = (label, val, fn, step) => h('label', { class: 'field' }, label, h('input', { type: 'number', step: step || 1, value: Math.round(val * 100) / 100, style: 'width:100%', onchange: (e) => { const v = +e.target.value; if (!isNaN(v)) { commit(); fn(v); autoKeyFor(items); render(); } } }));
+  const numTo = (label, val, fn, step) => h('label', { class: 'field' }, label, h('input', { type: 'number', step: step || 1, value: Math.round(val * 100) / 100, style: 'width:100%', onchange: (e) => { const v = numIn(e.target, val, 100); if (v === null) return; commit(); fn(clamp(v, -1e6, 1e6)); autoKeyFor(items); render(); } }));
   if (i.type === 'polygon' || i.type === 'star') right.append(h('h3', { text: i.type === 'star' ? 'Star' : 'Polygon' }), numTo(i.type === 'star' ? 'Points (3 to 12)' : 'Sides (3 to 12)', i.n || (i.type === 'star' ? 5 : 3), (v) => items.forEach((it) => { if (it.type === 'polygon' || it.type === 'star') it.n = clamp(Math.round(v), 3, 12); })));
   if (i.type === 'path') right.append(h('h3', { text: 'Path' }), chk('Closed shape', i.cl, (on) => items.forEach((it) => { if (it.type === 'path') { it.cl = on; if (on && it.fill === 'none') it.fill = '#d0d0d0'; } })), chk('Smooth curve', i.sm, (on) => items.forEach((it) => { if (it.type === 'path') it.sm = on; })));
   if (i.type === 'line') right.append(h('h3', { text: 'Line end' }), chk('Arrow head', i.ah, (on) => items.forEach((it) => { if (it.type === 'line') it.ah = on; })));
@@ -803,11 +812,12 @@ document.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = 
 function startPreview() {
   endSession();
   const frames = doc.items.filter((f) => f.type === 'frame' && !f.hidden); if (!frames.length) { toast('Add a frame first'); return; }
-  const start = (sel.size && get([...sel][0])?.type === 'frame' ? get([...sel][0]) : frames[0]);
+  const s0 = sel.size ? get([...sel][0]) : null, start = s0 && s0.type === 'frame' && !s0.hidden ? s0 : frames[0];
   const back = h('div', { class: 'modal-back pv', style: 'flex-direction:column;gap:16px' });
   preview = { back, frame: start, hist: [], hot: false };
   document.body.append(back); showPreviewFrame(start, 'none', true);
 }
+window.addEventListener('resize', () => { if (preview && preview.frame) showPreviewFrame(preview.frame, 'none', true); });
 function endPreview() { preview?.back.remove(); preview = null; }
 function previewBack() { if (!preview || !preview.hist.length) return; const f = get(preview.hist.pop()); if (f) showPreviewFrame(f, 'fade', true); }
 function showPreviewFrame(f, how = 'none', noPush = false) {
@@ -819,11 +829,12 @@ function showPreviewFrame(f, how = 'none', noPush = false) {
   const g = sv('g', { 'clip-path': 'url(#pvc)' }); s.append(g);
   g.append(itemEl({ ...f, name: '' }, true));
   for (const i of doc.items) {
-    if (i === f || i.type === 'frame' || !inside(i, f) || i.hidden) continue; const el = itemEl(i, true);
+    if (i === f || !inside(i, f) || i.hidden) continue; const el = itemEl(i, true);
     if (i.go && get(i.go)) { el.style.cursor = 'pointer'; el.addEventListener('click', () => showPreviewFrame(get(i.go), i.tr || 'none')); if (preview.hot) g.append(el), g.append(sv('rect', { x: i.x, y: i.y, width: i.w, height: i.h, fill: 'rgba(120,120,120,.25)', stroke: '#777', 'stroke-dasharray': '4 3', 'pointer-events': 'none' })); else g.append(el); }
     else g.append(el);
   }
-  const bar = h('div', { class: 'row pvbar' }, btn('Back', previewBack), h('span', { class: 'pvname', text: f.name }), btn(preview.hot ? 'Hide hotspots' : 'Show hotspots', () => { preview.hot = !preview.hot; showPreviewFrame(f, 'none', true); }), btn('Restart', () => { preview.hist = []; showPreviewFrame(doc.items.find((x) => x.type === 'frame' && !x.hidden), 'none', true); }), btn('Close preview', endPreview));
+  const backB = btn('Back', previewBack); backB.disabled = !preview.hist.length;
+  const bar = h('div', { class: 'row pvbar' }, backB, h('span', { class: 'pvname', text: f.name }), btn(preview.hot ? 'Hide hotspots' : 'Show hotspots', () => { preview.hot = !preview.hot; showPreviewFrame(f, 'none', true); }), btn('Restart', () => { preview.hist = []; showPreviewFrame(doc.items.find((x) => x.type === 'frame' && !x.hidden), 'none', true); }), btn('Close preview', endPreview));
   back.append(s, bar);
   if (how === 'fade' && s.animate) s.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240 });
   else if (how === 'slide' && s.animate) s.animate([{ transform: 'translateX(60px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'ease-out' });
@@ -998,7 +1009,7 @@ function homeTemplates() {
   const grid = h('div', { class: 'home-grid' });
   for (const [name, sub, make] of TEMPLATES) grid.append(h('button', { class: 'hcard', onclick: () => startDesign(make()) }, thumbBox(docThumb(make())), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })));
   if (folderView.key !== 'templates') loadFolderFiles('templates');
-  const mine = h('div', { class: 'home-grid' }, folderView.key === 'templates' ? folderView.files.map((f) => fileCard(f, () => startDesign({ id: uid(), title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })) }), h('div', { class: 'hacts' }, h('button', { class: 'hib hrm', title: 'Remove template', 'aria-label': 'Remove template', onkeydown: (ev) => ev.stopPropagation(), onclick: async (ev) => { ev.stopPropagation(); if (confirm('Remove this template? Your original project file is not touched.')) { try { await window.host.folders.del('templates', f.name); } catch (e) { toast('Could not remove it'); } loadFolderFiles('templates'); } } }, icon('del', 20))))) : []);
+  const mine = h('div', { class: 'home-grid' }, folderView.key === 'templates' ? folderView.files.map((f) => fileCard(f, () => startDesign({ id: uid(), title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })), motion: f.doc.motion ? JSON.parse(JSON.stringify(f.doc.motion)) : undefined }), h('div', { class: 'hacts' }, h('button', { class: 'hib hrm', title: 'Remove template', 'aria-label': 'Remove template', onkeydown: (ev) => ev.stopPropagation(), onclick: async (ev) => { ev.stopPropagation(); if (confirm('Remove this template? Your original project file is not touched.')) { try { await window.host.folders.del('templates', f.name); } catch (e) { toast('Could not remove it'); } loadFolderFiles('templates'); } } }, icon('del', 20))))) : []);
   return [h('div', { class: 'muted', style: 'margin:-6px 2px 12px', text: 'Start from a ready layout. Everything in it can be edited.' }), grid,
     h('div', { class: 'frow', style: 'margin-top:26px' }, h('h2', { style: 'margin:0', text: 'My templates' }), h('span', { class: 'grow' }), btn('Add your project', () => importInto('templates'), 'primary')),
     h('div', { class: 'muted', style: 'margin:6px 2px 12px', text: 'Upload a .frameout file and it becomes a template you can start new designs from. A copy is kept inside Frameout.' }),
