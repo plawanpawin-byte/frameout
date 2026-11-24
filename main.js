@@ -87,7 +87,12 @@ const TPL_DIR = () => path.join(app.getPath('userData'), 'templates');
 const MAX_READ = 6 * 1024 * 1024;
 function readFolders() { try { const l = JSON.parse(fs.readFileSync(FOLDER_FILE(), 'utf8')); return Array.isArray(l) ? l.filter((p) => typeof p === 'string') : []; } catch (_) { return []; } }
 function writeFolders(l) { fs.mkdirSync(path.dirname(FOLDER_FILE()), { recursive: true }); fs.writeFileSync(FOLDER_FILE(), JSON.stringify(l)); }
-const folderInfo = (p) => ({ path: p, name: path.basename(p) || p, exists: fs.existsSync(p) });
+const FOLDERS_DIR = () => path.join(app.getPath('userData'), 'folders');
+const inOwn = (p) => path.resolve(p).toLowerCase().startsWith(path.resolve(FOLDERS_DIR()).toLowerCase() + path.sep);
+function folderInfo(p) {
+  let count = 0, mtime = 0; try { for (const n of fs.readdirSync(p)) if (isDesign(n)) { count++; mtime = Math.max(mtime, fs.statSync(path.join(p, n)).mtimeMs); } if (!mtime) mtime = fs.statSync(p).mtimeMs; } catch (_) { /* missing */ }
+  return { path: p, name: path.basename(p) || p, exists: fs.existsSync(p), count, mtime, own: inOwn(p) };
+}
 function dirOf(key) {
   if (key === 'templates') { fs.mkdirSync(TPL_DIR(), { recursive: true }); return TPL_DIR(); }
   const k = path.resolve(String(key));
@@ -108,7 +113,12 @@ ipcMain.handle('folders:add', async () => {
   const l = readFolders(); for (const p of r.filePaths) if (!l.some((x) => path.resolve(x).toLowerCase() === path.resolve(p).toLowerCase())) l.push(p);
   writeFolders(l); return l.map(folderInfo);
 });
-ipcMain.handle('folders:remove', (_e, p) => { const k = path.resolve(String(p)).toLowerCase(); writeFolders(readFolders().filter((x) => path.resolve(x).toLowerCase() !== k)); return readFolders().map(folderInfo); });
+ipcMain.handle('folders:create', (_e, name) => {
+  const base = safeName(String(name || '')).replace(/\.+$/, '').trim().slice(0, 60); if (!base) throw new Error('Name needed');
+  fs.mkdirSync(FOLDERS_DIR(), { recursive: true }); let n = base, i = 2; while (fs.existsSync(path.join(FOLDERS_DIR(), n))) n = base + ' ' + (i++);
+  const p = path.join(FOLDERS_DIR(), n); fs.mkdirSync(p); const l = readFolders(); l.push(p); writeFolders(l); return { list: l.map(folderInfo), path: p };
+});
+ipcMain.handle('folders:remove', async (_e, p) => { const k = path.resolve(String(p)).toLowerCase(); if (inOwn(p) && readFolders().some((x) => path.resolve(x).toLowerCase() === k) && fs.existsSync(p)) { try { await shell.trashItem(path.resolve(p)); } catch (_) { /* keep the files if the bin fails */ } } writeFolders(readFolders().filter((x) => path.resolve(x).toLowerCase() !== k)); return readFolders().map(folderInfo); });
 ipcMain.handle('folders:files', (_e, key) => {
   const dir = dirOf(key); const out = [];
   let names = []; try { names = fs.readdirSync(dir); } catch (_) { return { missing: true, files: [] }; }

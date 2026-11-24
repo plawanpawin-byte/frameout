@@ -106,6 +106,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.29:** Folders are categories. The + beside Folders asks for a name and Frameout makes the folder itself; no folder picker. Home shows folder cards. Folder page is simpler. Templates page has no New design button.
+
 **1.0.28:** Snap and pink guide lines when you drag items (hold Alt to turn off).
 
 **1.0.27:** Auto keyframe in Motion mode.

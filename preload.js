@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('host', {
   readFile: (id) => ipcRenderer.invoke('file:read', id),
   folders: {
     list: () => ipcRenderer.invoke('folders:list'),
+    create: (n) => ipcRenderer.invoke('folders:create', n),
     add: () => ipcRenderer.invoke('folders:add'),
     remove: (p) => ipcRenderer.invoke('folders:remove', p),
     files: (k) => ipcRenderer.invoke('folders:files', k),

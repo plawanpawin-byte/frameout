@@ -90,3 +90,9 @@
 .tok{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 4px;border:0;border-radius:8px;background:var(--bg-3);color:var(--text);font:12px Consolas,monospace;cursor:pointer}
 .tok .sw{width:14px;height:14px;border-radius:4px;border:1px solid var(--bg-4)}
 label.field input[type=checkbox]{width:auto;flex:none;margin:0}
+.fcard{padding:10px;border:1px solid var(--bg-4);border-radius:14px}
+.fthumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.fthumbs .thumb{height:56px;padding:4px;border-radius:8px}
+.fcard .hname{display:flex;align-items:center;gap:6px}
+input.fname{height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--accent);background:var(--bg-3);color:var(--text);font:inherit;font-size:14px}
+input.fname:focus{outline:0}

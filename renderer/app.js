@@ -809,7 +809,7 @@ const SET_KEY = 'frameout.settings', SET_DEF = { recentMax: 12, openOn: 'home', 
 function getSet(k) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); const v = s && s[k]; if (k === 'recentMax') return [6, 12, 24].includes(v) ? v : SET_DEF[k]; if (k === 'openOn') return v === 'last' ? 'last' : 'home'; if (k === 'sideShut') return v === true; } catch (e) { /* defaults */ } return SET_DEF[k]; }
 function putSet(k, v) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {}; s[k] = v; localStorage.setItem(SET_KEY, JSON.stringify(s)); } catch (e) { /* not saved */ } }
 let homeTab = 'home';
-function showHome(tab) { autosave(); homeOpen = true; if (tab) homeTab = tab; home.style.display = 'flex'; renderHome(); }
+function showHome(tab) { autosave(); homeOpen = true; if (tab) homeTab = tab; home.style.display = 'flex'; for (const k in folderThumbs) delete folderThumbs[k]; renderHome(); loadFolders().then(() => { if (homeOpen) renderHome(); }); }
 function closeHome() { homeOpen = false; home.style.display = 'none'; }
 let folders = [], fileBind = null;
 function newBlank(target) {
@@ -840,6 +840,17 @@ function tpl(title, specs) {
 }
 function docThumb(d) { const keep = doc; let s = ''; try { doc = d; const fr = d.items.find((i) => i.type === 'frame'); const r = exportSvgString(fr || null); s = r ? r.str : ''; } catch (e) { /* no picture */ } doc = keep; return s; }
 function newCard(ic, name, sub, fn) { return h('button', { class: 'hcard', onclick: fn }, h('div', { class: 'thumb plus' }, icon(ic, 40)), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })); }
+const folderThumbs = {};
+function homeFolderCards() {
+  if (!folders.length) return [];
+  const row = h('div', { class: 'home-row' });
+  for (const f of folders) {
+    if (!folderThumbs[f.path]) { folderThumbs[f.path] = { files: [] }; window.host.folders.files(f.path).then((r) => { folderThumbs[f.path] = { files: r.files.slice(0, 3).map(parseDesignFile).filter(Boolean) }; if (homeOpen && homeTab === 'home') renderHome(); }).catch(() => {}); }
+    const th = h('div', { class: 'fthumbs' }); const fl = folderThumbs[f.path].files; for (let k = 0; k < 3; k++) th.append(fl[k] ? thumbBox(fl[k].svg) : h('div', { class: 'thumb' }));
+    row.append(h('button', { class: 'hcard fcard', onclick: () => { homeTab = 'folder:' + f.path; loadFolderFiles(f.path); renderHome(); } }, th, h('div', { class: 'hname' }, h('span', { class: 'hic' }, icon('open')), ' ' + f.name), h('div', { class: 'hsub', text: (f.count === 1 ? '1 design' : f.count + ' designs') + ' · ' + ago(f.mtime) })));
+  }
+  return [h('h2', { text: 'Folders' }), row];
+}
 function homeHome() {
   const recent = readRecent();
   const grid = h('div', { class: 'home-grid' });
@@ -852,6 +863,7 @@ function homeHome() {
     newCard('plus', 'New design', 'Start with an empty canvas', () => newBlank()),
     newCard('open', 'Open file', 'A .frameout file from your computer', () => openDoc()),
     newCard('example', 'Example', 'Two linked mobile screens to explore', () => startDesign(sampleDoc()))),
+  ...homeFolderCards(),
   h('h2', { text: 'Recent' }), recent.length ? grid : h('div', { class: 'muted', style: 'padding:8px 2px', text: 'Designs you work on appear here, with a small picture, and are kept on this computer.' })];
 }
 function homeTemplates() {
@@ -882,13 +894,25 @@ async function loadFolders() { try { folders = await window.host.folders.list();
 async function loadFolderFiles(key) {
   folderView = { key, files: [], missing: false, loading: true };
   try { const r = await window.host.folders.files(key); folderView = { key, files: r.files.map((f) => parseDesignFile(f)).filter(Boolean), missing: r.missing, loading: false }; } catch (e) { folderView = { key, files: [], missing: true, loading: false }; }
+  if (key !== 'templates') delete folderThumbs[key];
   if (homeOpen && homeTab === (key === 'templates' ? 'templates' : 'folder:' + key)) renderHome();
 }
 function parseDesignFile(f) {
   try { const d = JSON.parse(f.text); if (!d || !Array.isArray(d.items)) return null; const dd = { id: String(d.id || uid()).slice(0, 24), title: String(d.title || f.name.replace(/\.frameout$/i, '')), items: d.items.map(cleanItem), motion: cleanMotion(d.motion) }; return { name: f.name, mtime: f.mtime, doc: dd, svg: docThumb(dd) }; } catch (e) { return null; }
 }
-async function addFolder() { const before = folders.length; try { folders = await window.host.folders.add(); } catch (e) { toast('Could not add the folder'); return; } if (folders.length > before) { homeTab = 'folder:' + folders[folders.length - 1].path; loadFolderFiles(folders[folders.length - 1].path); } renderHome(); }
-async function removeFolder(p) { if (!confirm('Remove this folder from Frameout? The folder and the files in it stay on your computer.')) return; folders = await window.host.folders.remove(p); homeTab = 'home'; renderHome(); }
+function addFolder() {
+  const back = h('div', { class: 'modal-back' }); const close = () => back.remove();
+  const inp = h('input', { class: 'fname', placeholder: 'Folder name', maxlength: 60, 'aria-label': 'Folder name' });
+  const go = h('button', { class: 'btn primary', disabled: true, text: 'Create' });
+  const make = async () => { const n = inp.value.trim(); if (!n) return; try { const r = await window.host.folders.create(n); folders = r.list; close(); homeTab = 'folder:' + r.path; loadFolderFiles(r.path); renderHome(); } catch (e) { toast('Could not create the folder'); } };
+  inp.addEventListener('input', () => { go.disabled = !inp.value.trim(); });
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') make(); if (e.key === 'Escape') close(); });
+  go.onclick = make;
+  back.append(h('div', { class: 'modal', role: 'dialog', 'aria-label': 'New folder' }, h('h2', { text: 'New folder' }), h('div', { class: 'muted', text: 'A folder is a category for your designs, like Website or Mobile app.' }), inp, h('div', { class: 'frow', style: 'margin:0;justify-content:flex-end' }, h('button', { class: 'btn', text: 'Cancel', onclick: close }), go)));
+  back.addEventListener('pointerdown', (e) => { if (e.target === back) close(); });
+  document.body.append(back); inp.focus();
+}
+async function removeFolder(p) { const fo = folders.find((x) => x.path === p); if (!confirm('Delete the folder "' + (fo ? fo.name : '') + '" and the designs in it? They go to the Recycle Bin.')) return; folders = await window.host.folders.remove(p); homeTab = 'home'; renderHome(); }
 async function importInto(key) { try { const n = await window.host.folders.import(key); if (n) toast(n === 1 ? 'Added 1 file' : 'Added ' + n + ' files'); } catch (e) { toast('Could not add files'); } loadFolderFiles(key); }
 function openFromFolder(key, folderName, f) { const d = { id: f.doc.id, title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })), motion: f.doc.motion }; startDesign(d, { key, name: f.name, folder: folderName }); }
 async function newInFolder(key, folderName, d) { const bytes = new TextEncoder().encode(JSON.stringify(d, null, 1)); try { const n = await window.host.folders.save(key, d.title + '.frameout', bytes, false); fileBind = { key, name: n, folder: folderName }; savedSnap = snapshot(); } catch (e) { toast('Could not save into the folder'); } }
@@ -898,9 +922,8 @@ function homeFolder(key) {
   if (!fo) return [h('div', { class: 'muted', text: 'This folder is not in your list any more.' })];
   if (folderView.key !== key) { loadFolderFiles(key); return [h('div', { class: 'muted', text: 'Loading…' })]; }
   const grid = h('div', { class: 'home-grid' }, folderView.files.map((f) => fileCard(f, () => openFromFolder(key, fo.name, f))));
-  return [h('div', { class: 'muted', style: 'margin:-6px 2px 14px;word-break:break-all', text: fo.path }),
-    h('div', { class: 'frow' }, btn('New design here', () => newBlank({ key, name: fo.name }), 'primary'), btn('Add files', () => importInto(key)), btn('Open in Explorer', () => window.host.folders.open(key)), h('span', { class: 'grow' }), btn('Remove folder', () => removeFolder(key))),
-    folderView.loading ? h('div', { class: 'muted', text: 'Loading…' }) : folderView.missing ? h('div', { class: 'muted', text: 'This folder cannot be found. It may have been moved or deleted.' }) : folderView.files.length ? grid : h('div', { class: 'muted', style: 'padding:8px 2px', text: 'No designs here yet. Press New design here, or Add files to bring in .frameout files you already have.' })];
+  return [h('div', { class: 'frow' }, h('span', { class: 'muted', text: folderView.files.length === 1 ? '1 design' : folderView.files.length + ' designs' }), h('span', { class: 'grow' }), btn('Delete folder', () => removeFolder(key))),
+    folderView.loading ? h('div', { class: 'muted', text: 'Loading…' }) : folderView.missing ? h('div', { class: 'muted', text: 'This folder cannot be found. It may have been moved or deleted.' }) : folderView.files.length ? grid : h('div', { class: 'muted', style: 'padding:8px 2px', text: 'Nothing here yet. Press New design to make the first one.' })];
 }
 function renderHome() {
   home.textContent = '';
@@ -909,14 +932,14 @@ function renderHome() {
   const side = h('nav', { class: 'home-side' + (shut ? ' shut' : '') },
     h('div', { class: 'home-logo' }, h('button', { class: 'htab hbar', title: shut ? 'Open sidebar' : 'Close sidebar', 'aria-label': 'Toggle sidebar', onclick: () => { putSet('sideShut', !shut); renderHome(); } }, h('span', { class: 'hic' }, icon('menu'))), h('span', { class: 'hlabel', text: 'Frameout' })),
     tabs.map(([id, name, ic]) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), title: name, onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic' }, icon(ic)), h('span', { class: 'hlabel', text: name }))),
-    h('div', { class: 'hsec' }, h('span', { class: 'hlabel', text: 'Folders' }), h('button', { class: 'hplus', title: 'Add a folder from this computer', 'aria-label': 'Add folder', onclick: addFolder }, icon('plus', 16))),
+    h('div', { class: 'hsec' }, h('span', { class: 'hlabel', text: 'Folders' }), h('button', { class: 'hplus', title: 'New folder', 'aria-label': 'New folder', onclick: addFolder }, icon('plus', 16))),
     h('div', { class: 'hfolders' }, folders.map((f) => h('button', { class: 'htab' + (homeTab === 'folder:' + f.path ? ' on' : ''), title: f.path, onclick: () => { homeTab = 'folder:' + f.path; loadFolderFiles(f.path); renderHome(); } }, h('span', { class: 'hic' }, icon('open')), h('span', { class: 'hlabel', text: f.name })))), 
-    shut ? h('button', { class: 'htab', title: 'Add folder', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus'))) : (folders.length ? h('span') : h('button', { class: 'htab', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus')), h('span', { class: 'hlabel', text: 'New folder' }))),
+    shut ? h('button', { class: 'htab', title: 'New folder', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus'))) : (folders.length ? h('span') : h('button', { class: 'htab', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus')), h('span', { class: 'hlabel', text: 'New folder' }))),
     h('span', { class: 'grow' }), session ? h('button', { class: 'htab', onclick: closeHome }, h('span', { class: 'hic' }, icon('back')), h('span', { class: 'hlabel', text: 'Back to design' })) : h('span'));
   const isF = homeTab.startsWith('folder:'), fkey = isF ? homeTab.slice(7) : '', fo = isF ? folders.find((x) => x.path === fkey) : null;
   const body = homeTab === 'templates' ? homeTemplates() : homeTab === 'settings' ? homeSettings() : isF ? homeFolder(fkey) : homeHome();
   home.append(side, h('div', { class: 'home-main' }, h('div', { class: 'home-in' },
-    h('div', { class: 'home-head' }, h('h1', { text: homeTab === 'templates' ? 'Templates' : homeTab === 'settings' ? 'Settings' : isF ? (fo ? fo.name : 'Folder') : 'Home' }), h('span', { class: 'grow' }), btn('New design', () => newBlank(isF && fo ? { key: fkey, name: fo.name } : null), 'primary')), ...body)));
+    h('div', { class: 'home-head' }, h('h1', { text: homeTab === 'templates' ? 'Templates' : homeTab === 'settings' ? 'Settings' : isF ? (fo ? fo.name : 'Folder') : 'Home' }), h('span', { class: 'grow' }), homeTab === 'templates' || homeTab === 'settings' ? h('span') : btn('New design', () => newBlank(isF && fo ? { key: fkey, name: fo.name } : null), 'primary')), ...body)));
 }
 const SIZES = [
   ['Phone', [['iPhone', 393, 852], ['Android', 360, 800], ['Small phone', 320, 568]]],
