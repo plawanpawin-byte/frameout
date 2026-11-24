@@ -1024,7 +1024,9 @@ function openRecent(e) {
   try { const d = JSON.parse(e.doc); if (!Array.isArray(d.items)) throw new Error('damaged'); startDesign({ id: e.id, title: String(d.title || e.title || 'Untitled design'), items: d.items.map(cleanItem), motion: cleanMotion(d.motion) }); }
   catch (err) { toast('Cannot open this design'); }
 }
-function removeRecent(id) { writeRecent(readRecent().filter((e) => e.id !== id)); const s = readStars(); if (s.delete(id)) writeStars(s); renderHome(); }
+// taking the open design out of Recent sticks until it is edited again: autosave sees nothing new to keep
+function forgetOpen() { if (session && doc.items.length) lastSaved = JSON.stringify(restDoc()); }
+function removeRecent(id) { writeRecent(readRecent().filter((e) => e.id !== id)); if (id === doc.id) forgetOpen(); const s = readStars(); if (s.delete(id)) writeStars(s); renderHome(); }
 function ago(t) { const d = new Date(t), now = new Date(); const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); const diff = Math.round((day(now) - day(d)) / 86400000); const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); return diff <= 0 ? 'Today ' + hm : diff === 1 ? 'Yesterday ' + hm : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); }
 function thumbBox(svgStr, cls = '') { const box = h('div', { class: 'thumb ' + cls }); if (svgStr) box.append(h('img', { src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr), alt: '' })); else box.append(h('span', { class: 'muted', text: 'Empty' })); return box; }
 // starter templates, built in code so they stay small and work offline
@@ -1121,7 +1123,7 @@ function homeSettings() {
   return [h('div', { class: 'settings' },
     row('When Frameout opens', 'Show this home screen, or jump back into the design you edited last.', pick([['home', 'Home'], ['last', 'Last design']], getSet('openOn'), (v) => putSet('openOn', v))),
     row('Recent designs to keep', 'More designs use more space on this computer. Older ones drop off first. Starred designs are always kept.', pick([[6, '6'], [12, '12'], [24, '24']], getSet('recentMax'), (v) => { putSet('recentMax', v); writeRecent(keepRecent(readRecent(), v)); })),
-    row('Space used by Recent', mb + ' on this computer. Saved .frameout files are not affected.', btn('Clear recent', () => { if (!readRecent().length) return; if (confirm('Remove all designs from Recent, starred ones too? Files you saved are not touched.')) { writeRecent([]); writeStars(new Set()); renderHome(); toast('Recent cleared'); } })),
+    row('Space used by Recent', mb + ' on this computer. Saved .frameout files are not affected.', btn('Clear recent', () => { if (!readRecent().length) return; if (confirm('Remove all designs from Recent, starred ones too? Files you saved are not touched.')) { writeRecent([]); forgetOpen(); writeStars(new Set()); renderHome(); toast('Recent cleared'); } })),
     row('Privacy', 'Frameout never connects to the internet. Your designs stay on this computer.', h('span')),
     row('About', 'Frameout, part of the Lookout apps. Works fully offline.', h('span')))];
 }
