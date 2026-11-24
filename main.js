@@ -37,8 +37,14 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  // the page blocks closing while the design has changes that are not in a file; ask instead of doing nothing
+  // the page blocks closing while the design has changes that are not in a file; ask instead of doing nothing.
+  // Only a window close asks. Anything else that unloads the page (there is no menu, so only a reload from
+  // tools) keeps the old behaviour: it is held back quietly, with no dialog that could block a test run.
+  let closing = false;
+  win.on('close', () => { closing = true; });
   win.webContents.on('will-prevent-unload', (e) => {
+    if (!closing) return;
+    closing = false;
     const c = dialog.showMessageBoxSync(win, { type: 'question', buttons: ['Close without saving', 'Cancel'], defaultId: 1, cancelId: 1, noLink: true, title: TITLE,
       message: 'This design has changes that are not saved to a file.', detail: 'A copy is kept in Recent designs on the home screen.' });
     if (c === 0) e.preventDefault();
