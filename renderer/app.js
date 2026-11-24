@@ -56,8 +56,10 @@ const snapshot = () => JSON.stringify(doc);
 function commit() { undoS.push(snapshot()); if (undoS.length > 100) undoS.shift(); redoS = []; }
 // a pen path or a mouse drag in progress belongs to the history step being undone, so end it first
 function endOps() { if (drag) { if (drag.r) drag.r.remove(); drag = null; } if (pen) { pen = null; setTool('select'); } }
-function undo() { endOps(); if (!undoS.length) return; redoS.push(snapshot()); doc = JSON.parse(undoS.pop()); sel.clear(); render(); }
-function redo() { endOps(); if (!redoS.length) return; undoS.push(snapshot()); doc = JSON.parse(redoS.pop()); sel.clear(); render(); }
+// after undo/redo: keep the selected layers that still exist; outside Motion mode put animated layers at time 0
+function restPose() { sel = new Set([...sel].filter((id) => get(id))); if (mode !== 'motion') applyPose(0); }
+function undo() { endOps(); if (!undoS.length) return; redoS.push(snapshot()); doc = JSON.parse(undoS.pop()); restPose(); render(); }
+function redo() { endOps(); if (!redoS.length) return; undoS.push(snapshot()); doc = JSON.parse(redoS.pop()); restPose(); render(); }
 const get = (id) => doc.items.find((i) => i.id === id);
 const FILLS = ['#ffffff', '#e4e4e4', '#bdbdbd', '#8a8a8a', '#4a4a4a', '#262626', '#d9e0e6', '#e6e0d2', '#dce6dc', '#e8d9d9'];
 const NAMES = { frame: 'Frame', rect: 'Rectangle', ellipse: 'Ellipse', text: 'Text', line: 'Line', image: 'Image', polygon: 'Polygon', star: 'Star', path: 'Path' };
@@ -276,6 +278,8 @@ stage.append(dock);
 const zoomPct = h('button', { class: 'zk zpct', title: 'Zoom to 100%', 'aria-label': 'Zoom to 100%', onclick: () => zoomBy(1 / zoom), text: '100%' });
 const zk = (ic, label, fn) => h('button', { class: 'zk', title: label, 'aria-label': label, onclick: fn }, dockIcon(ic, 20));
 stage.append(h('div', { class: 'zoomctl', role: 'group', 'aria-label': 'Zoom' }, zk('zout', 'Zoom out', () => zoomBy(1 / 1.2)), zoomPct, zk('zin', 'Zoom in', () => zoomBy(1.2)), zk('fit', 'Fit to screen', () => fit())));
+// is this tool in the dock of the current mode (so its shortcut may pick it)?
+const offered = (t) => Object.values(grpEls).some((g) => g.list.some((x) => x[0] === t));
 function setTool(t) {
   if (pen && t !== 'pen') penFinish(false);
   tool = t; for (const g in GROUPS) if (GROUPS[g].some((x) => x[0] === t)) grpCur[g] = t;
@@ -364,7 +368,7 @@ function itemEl(i, forExport = false) {
 }
 function render() {
   if (document.activeElement !== titleInput) titleInput.value = doc.title || '';
-  syncInstances(); applyLayouts();
+  syncInstances(); applyLayouts(); syncRest();
   gItems.textContent = ''; gUI.textContent = '';
   for (const i of doc.items) gItems.append(itemEl(i));
   for (const id of sel) {
@@ -410,11 +414,16 @@ function renderLeft() {
   if (!masters.length) left.append(h('div', { class: 'muted', style: 'padding:4px 8px;font-size:12px', text: 'Select a layer and press Create component.' }));
   for (const m of masters) left.append(h('div', { class: 'item', style: 'display:flex;gap:4px;align-items:center;padding:3px 6px' }, h('span', { class: 'grow', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: '\u25C6 ' + m.name }), btn('Insert', () => insertInstance(m))));
 }
+const TIPS = {
+  design: 'Pick a tool or press its letter, then drag on the canvas.\nShift-click to select several.\nScroll to pan, Ctrl+scroll to zoom, hold Space to pan.\nGive a shape a Link to a frame, then press Preview to click through your prototype.',
+  draw: 'Pick the pen, pencil or a shape, then draw on the canvas.\nPen: click to add points, click the first point to close the shape, press Enter to finish.\nScroll to pan, Ctrl+scroll to zoom, hold Space to pan.',
+  motion: 'Click a layer to animate it.\nPut the playhead on a time and press Add keyframe. Move the playhead, change the layer and add another keyframe.\nTurn on Auto keyframe to record changes by themselves, then press Play.',
+};
 function renderRight() {
   right.textContent = '';
   if (mode === 'dev') { right.append(phead('Code', 'right')); renderDev(); return; }
   right.append(phead(mode === 'motion' ? 'Motion' : 'Design', 'right'), h('label', { class: 'field' }, 'Title', h('input', { type: 'text', value: doc.title, oninput: (e) => { doc.title = e.target.value; } })));
-  const items = [...sel].map(get).filter(Boolean); if (!items.length) { right.append(h('h3', { text: 'Tips' }), h('div', { class: 'muted', style: 'font-size:12px;line-height:1.6;white-space:pre-line', text: 'Pick a tool or press its letter, then drag on the canvas.\nShift-click to select several.\nScroll to pan, Ctrl+scroll to zoom, hold Space to pan.\nGive a shape a Link to a frame, then press Preview to click through your prototype.' })); return; }
+  const items = [...sel].map(get).filter(Boolean); if (!items.length) { right.append(h('h3', { text: 'Tips' }), h('div', { class: 'muted', style: 'font-size:12px;line-height:1.6;white-space:pre-line', text: TIPS[mode] || TIPS.design })); return; }
   const i = items[0];
   let nameUndo = false;
   const num = (label, key) => h('label', { class: 'field' }, label, h('input', { type: 'number', value: Math.round(i[key] * 10) / 10, style: 'width:100%', onchange: (e) => { const v = +e.target.value; if (!isNaN(v)) { commit(); items.forEach((it) => { if (['w', 'h'].includes(key)) it[key] = Math.max(1, v); else it[key] = v; }); autoKeyFor(items); render(); } } }));
@@ -500,6 +509,15 @@ function restDoc() {
   if (!hasMotion()) return doc;
   const c = JSON.parse(JSON.stringify(doc)); for (const id of Object.keys(c.motion.tracks)) { const it = c.items.find((x) => x.id === id), k = c.motion.tracks[id]; if (it && k.length) { const p = poseOf(k, 0); for (const key of KEYS) it[key] = p[key]; } } return c;
 }
+// outside Motion mode an animated layer shows its time-0 pose; if it was moved or changed there (Design mode,
+// layer panel, align...), shift all its keyframes by the same amount so the change is kept and the animation follows
+function syncRest() {
+  if (mode === 'motion' || playing || !hasMotion()) return;
+  for (const id of Object.keys(doc.motion.tracks)) {
+    const it = get(id), k = doc.motion.tracks[id]; if (!it || !k.length) continue; const p = poseOf(k, 0);
+    for (const key of KEYS) { const cur = key === 'rot' ? it.rot || 0 : it[key], want = key === 'op' ? clamp(p.op, 0.05, 1) : p[key], d = cur - want; if (Number.isFinite(d) && Math.abs(d) > 1e-6) for (const e of k) e[key] = key === 'op' ? clamp(e[key] + d, 0.05, 1) : e[key] + d; }
+  }
+}
 function keyAt(it) {
   const m = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); const k = m.tracks[it.id] || (m.tracks[it.id] = []);
   for (let n = k.length - 1; n >= 0; n--) if (Math.abs(k[n].t - playhead) < 20) k.splice(n, 1);
@@ -552,7 +570,7 @@ function renderTimeline() {
 function setMode(m) {
   if (m === mode) return; if (pen) penFinish(false); if (playing) stopPlay();
   if (mode === 'motion') { playhead = 0; applyPose(0); }
-  mode = m; closeFly(); buildDock(); setTool(m === 'draw' ? 'pen' : 'select'); sel.clear(); render();
+  mode = m; closeFly(); buildDock(); setTool(m === 'draw' ? 'pen' : 'select'); sel = new Set([...sel].filter((id) => get(id))); render();
 }
 // ---------- dev mode (inspect) ----------
 const px = (n) => Math.round(n * 100) / 100 + 'px';
@@ -617,7 +635,9 @@ function align(a) {
 function del() {
   if (!sel.size) return; commit(); const ids = expand(sel);
   for (const id of ids) { const x = get(id); if (x && x.master) for (const c of doc.items.filter((y) => y.inst === id)) detach(c.id); if (x && x.inst) doc.items = doc.items.filter((y) => y.instRoot !== id); }
-  doc.items = doc.items.filter((i) => !ids.has(i.id)); for (const i of doc.items) if (ids.has(i.go)) i.go = ''; sel.clear(); render();
+  doc.items = doc.items.filter((i) => !ids.has(i.id)); for (const i of doc.items) if (ids.has(i.go)) i.go = '';
+  if (doc.motion) for (const id of Object.keys(doc.motion.tracks)) if (!get(id)) delete doc.motion.tracks[id];
+  sel.clear(); render();
 }
 // copies of the chosen items and, for frames, everything inside them; returns the new ids of the chosen ones
 function cloneSet(chosen, dx, dy) {
@@ -769,18 +789,19 @@ document.addEventListener('keydown', (e) => {
   else if (e.ctrlKey && k === 'a') { e.preventDefault(); sel = new Set(doc.items.map((i) => i.id)); render(); }
   else if (e.ctrlKey && k === 'c') { if (sel.size) { const ex = expand(sel); clip = JSON.stringify({ items: doc.items.filter((i) => ex.has(i.id) && !i.instOf), roots: [...sel], off: copyOffset(sel) }); toast('Copied'); } }
   else if (e.ctrlKey && k === 'v') { if (!clip) return; commit(); const c = JSON.parse(clip), map = new Map(); sel.clear(); for (const i of c.items) { const o = i.id; i.id = uid(); i.x += (c.off || [24, 24])[0]; i.y += (c.off || [24, 24])[1]; delete i.master; map.set(o, i); } for (const i of map.values()) { if (map.has(i.go)) i.go = map.get(i.go).id; doc.items.push(i); } for (const r of c.roots) if (map.has(r)) sel.add(map.get(r).id); render(); }
-  else if (e.shiftKey && k === 'i') { pickImages(); }
+  else if (e.shiftKey && k === 'i') { if (offered('image')) pickImages(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') del();
   else if (e.key === 'Enter' && pen) { penFinish(false); }
   else if (e.key === 'Escape') { if (fly) { closeFly(); return; } if (cancelDrag()) return; if (pen) { penFinish(false); return; } sel.clear(); setTool('select'); render(); }
   else if (e.key.startsWith('Arrow') && sel.size) { e.preventDefault(); const d = e.shiftKey ? 10 : 1; commit(); doc.items.filter((i) => sel.has(i.id)).forEach((i) => { if (e.key === 'ArrowLeft') i.x -= d; if (e.key === 'ArrowRight') i.x += d; if (e.key === 'ArrowUp') i.y -= d; if (e.key === 'ArrowDown') i.y += d; }); autoKeyFor(doc.items.filter((i) => sel.has(i.id))); render(); }
-  else if (!e.ctrlKey && e.shiftKey && (k === 'l' || k === 'p')) setTool(k === 'l' ? 'arrow' : 'pencil');
-  else if (!e.ctrlKey && mode !== 'dev' && 'vhfrolpt'.includes(k) && k.length === 1) { const t = { v: 'select', h: 'hand', f: 'frame', r: 'rect', o: 'ellipse', l: 'line', p: 'pen', t: 'text' }[k]; if (mode === 'design' || ['select', 'hand', 'rect', 'ellipse', 'line', 'pen'].includes(t)) setTool(t); }
+  else if (!e.ctrlKey && e.shiftKey && (k === 'l' || k === 'p')) { const t = k === 'l' ? 'arrow' : 'pencil'; if (offered(t)) setTool(t); }
+  else if (!e.ctrlKey && 'vhfrolpt'.includes(k) && k.length === 1) { const t = { v: 'select', h: 'hand', f: 'frame', r: 'rect', o: 'ellipse', l: 'line', p: 'pen', t: 'text' }[k]; if (offered(t)) setTool(t); }
 });
 document.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = false; });
 
 // ---------- prototype preview ----------
 function startPreview() {
+  endSession();
   const frames = doc.items.filter((f) => f.type === 'frame' && !f.hidden); if (!frames.length) { toast('Add a frame first'); return; }
   const start = (sel.size && get([...sel][0])?.type === 'frame' ? get([...sel][0]) : frames[0]);
   const back = h('div', { class: 'modal-back pv', style: 'flex-direction:column;gap:16px' });
@@ -812,7 +833,7 @@ function showPreviewFrame(f, how = 'none', noPush = false) {
 const cleanItem = (i) => ({ id: String(i.id || uid()), type: NAMES[i.type] ? i.type : 'rect', name: String(i.name || 'Layer'), x: +i.x || 0, y: +i.y || 0, w: +i.w || 0, h: +i.h || 0, fill: i.fill === 'none' ? 'none' : hex(i.fill, '#d0d0d0'), stroke: hex(i.stroke, '#000000'), sw: Math.max(0, +i.sw || 0), r: Math.max(0, +i.r || 0), op: clamp(+i.op || 1, 0.05, 1), text: String(i.text || ''), fs: clamp(+i.fs || 16, 6, 400), go: String(i.go || ''), tr: ['fade', 'slide'].includes(i.tr) ? i.tr : 'none', master: !!i.master, inst: i.inst ? String(i.inst) : undefined, instOf: i.instOf ? String(i.instOf) : undefined, instRoot: i.instRoot ? String(i.instRoot) : undefined, ov: !!i.ov, al: i.al && ['v', 'h'].includes(i.al.dir) ? { dir: i.al.dir, gap: Math.max(0, +i.al.gap || 0), pad: Math.max(0, +i.al.pad || 0), align: ['center', 'end'].includes(i.al.align) ? i.al.align : 'start', hug: !!i.al.hug } : undefined, hidden: !!i.hidden, locked: !!i.locked, rot: clamp(+i.rot || 0, -360, 360), fill2: /^#[0-9a-f]{6}$/i.test(i.fill2) ? i.fill2 : '', ga: clamp(Number.isFinite(+i.ga) && i.ga !== undefined ? +i.ga : 90, -360, 360), sh: i.sh && typeof i.sh === 'object' ? { x: clamp(+i.sh.x || 0, -200, 200), y: clamp(+i.sh.y || 0, -200, 200), b: clamp(+i.sh.b || 0, 0, 200), o: clamp(+i.sh.o || 0.25, 0.02, 1) } : undefined, ff: FONTS[i.ff] ? i.ff : 'sans', fw: +i.fw === 700 ? 700 : 400, ta: ['center', 'right'].includes(i.ta) ? i.ta : 'left', n: clamp(Math.round(+i.n || (i.type === 'star' ? 5 : 3)), 3, 12), ah: !!i.ah, cl: !!i.cl, sm: !!i.sm, pts: i.type === 'path' && Array.isArray(i.pts) ? i.pts.slice(0, 3000).map((p) => [clamp(+(p && p[0]) || 0, 0, 1), clamp(+(p && p[1]) || 0, 0, 1)]) : undefined, note: String(i.note || '').slice(0, 500), rd: !!i.rd, src: i.type === 'image' && typeof i.src === 'string' && i.src.length < 12e6 && IMG_OK.test(i.src) ? i.src : undefined });
 async function openDoc(dropped) {
   const f = (dropped && dropped.data) ? dropped : (await window.host.openFiles({ filters: [['Frameout design', ['frameout', 'json']]] }))[0]; if (!f) return;
-  try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); autosave(); doc = { id: String(d.id || uid()).slice(0, 24), title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem), motion: cleanMotion(d.motion) }; fileName = f.name; fileBind = null; sel.clear(); undoS = []; savedSnap = snapshot(); session = true; closeHome(); fit(); }
+  try { const d = JSON.parse(new TextDecoder().decode(f.data)); if (!Array.isArray(d.items)) throw new Error('Not a Frameout file'); startDesign({ id: String(d.id || uid()).slice(0, 24), title: String(d.title || 'Untitled design'), items: d.items.map(cleanItem), motion: cleanMotion(d.motion) }); fileName = f.name; renderStatus(); }
   catch (e) { toast('Cannot open: ' + e.message); }
 }
 async function saveDoc() {
@@ -880,14 +901,16 @@ const SET_KEY = 'frameout.settings', SET_DEF = { recentMax: 12, openOn: 'home', 
 function getSet(k) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); const v = s && s[k]; if (k === 'recentMax') return [6, 12, 24].includes(v) ? v : SET_DEF[k]; if (k === 'openOn') return v === 'last' ? 'last' : 'home'; if (k === 'sideShut') return v === true; } catch (e) { /* defaults */ } return SET_DEF[k]; }
 function putSet(k, v) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {}; s[k] = v; localStorage.setItem(SET_KEY, JSON.stringify(s)); } catch (e) { /* not saved */ } }
 let homeTab = 'home';
-function showHome(tab) { autosave(); homeOpen = true; if (tab) homeTab = tab; home.style.display = 'flex'; for (const k in folderThumbs) delete folderThumbs[k]; renderHome(); loadFolders().then(() => { if (homeOpen) renderHome(); }); }
+function showHome(tab) { endSession(); autosave(); homeOpen = true; if (tab) homeTab = tab; home.style.display = 'flex'; for (const k in folderThumbs) delete folderThumbs[k]; renderHome(); loadFolders().then(() => { if (homeOpen) renderHome(); }); }
 function closeHome() { homeOpen = false; home.style.display = 'none'; }
 let folders = [], fileBind = null;
 function newBlank(target) {
   if (target && !target.key) target = null; const d = { id: uid(), title: 'Untitled design', items: [] };
-  mode = 'design'; playhead = 0; buildDock(); startDesign(d); if (target) newInFolder(target.key, target.name, d);
+  endSession(); mode = 'design'; playhead = 0; buildDock(); startDesign(d); if (target) newInFolder(target.key, target.name, d);
 }
-function startDesign(d, bind) { if (mode === 'motion') { if (playing) stopPlay(); } if (mode !== 'design') { mode = 'design'; buildDock(); } playhead = 0;  autosave(); fileBind = bind || null; doc = d; sel.clear(); undoS = []; redoS = []; fileName = ''; savedSnap = snapshot(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
+function endSession() { if (pen) penFinish(false); endOps(); if (playing) stopPlay(); }
+function startDesign(d, bind) { endSession(); if (mode !== 'design') { mode = 'design'; buildDock(); } playhead = 0; autosave(); fileBind = bind || null; doc = d; sel.clear();
+  if (doc.motion) { for (const id of Object.keys(doc.motion.tracks)) if (!get(id)) delete doc.motion.tracks[id]; applyPose(0); } undoS = []; redoS = []; fileName = ''; savedSnap = snapshot(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
 function openRecent(e) {
   try { const d = JSON.parse(e.doc); if (!Array.isArray(d.items)) throw new Error('damaged'); startDesign({ id: e.id, title: String(d.title || e.title || 'Untitled design'), items: d.items.map(cleanItem), motion: cleanMotion(d.motion) }); }
   catch (err) { toast('Cannot open this design'); }
