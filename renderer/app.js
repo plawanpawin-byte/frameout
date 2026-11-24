@@ -262,6 +262,8 @@ function openFly(g, anchor) {
   stage.append(fly); flyAnchor = anchor.querySelector('.dkc') || anchor;
 }
 document.addEventListener('pointerdown', (e) => { if (fly && !fly.contains(e.target) && !e.target.closest('.dkc,[data-menu]')) closeFly(); }, true);
+// focus leaving an open menu (Tab, Shift+Tab, a click elsewhere) closes it, so it never stays open behind the focus
+document.addEventListener('focusin', (e) => { if (fly && !fly.contains(e.target) && !e.target.closest('.dkc,[data-menu]')) closeFly(); });
 function toolGroup(g, skip) {
   const list = GROUPS[g].filter((t) => !(skip || []).includes(t[0])), box = h('div', { class: 'dgt' });
   const main = h('button', { class: 'dk', onclick: () => setTool(grpCur[g]) });
@@ -852,6 +854,7 @@ document.addEventListener('keydown', (e) => {
   if (preview) { if (e.key === 'Escape') endPreview(); else if (e.key === 'Backspace' || e.key === 'ArrowLeft') previewBack(); return; }
   if (fly && !document.querySelector('.modal-back')) { // open menu: Esc closes it and gives focus back, arrows move between items
     if (e.key === 'Escape') { e.preventDefault(); closeFly(true); return; }
+    if (e.key === 'Tab') { setTimeout(() => { if (fly && !fly.contains(document.activeElement)) closeFly(); }); return; } // Tab moves on as usual and the menu closes behind it
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && fly.contains(e.target)) { e.preventDefault(); fly.classList.add('kb'); const it = [...fly.querySelectorAll('.fi')], i = it.indexOf(e.target); it[(i + (e.key === 'ArrowDown' ? 1 : it.length - 1)) % it.length].focus(); return; }
     return; // any other key belongs to the menu: Tab, Enter and Space keep their normal job, shortcuts wait until it closes
   }
