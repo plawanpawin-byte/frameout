@@ -842,8 +842,8 @@ document.addEventListener('keydown', (e) => {
   else if (e.ctrlKey && k === 's') { e.preventDefault(); saveDoc(); }
   else if (e.ctrlKey && k === 'o') { e.preventDefault(); openDoc(); }
   else if (e.ctrlKey && k === 'a') { e.preventDefault(); sel = new Set(doc.items.filter((i) => !i.locked).map((i) => i.id)); render(); }
-  else if (e.ctrlKey && k === 'c') { if (sel.size) { const ex = expand(sel); clip = JSON.stringify({ items: doc.items.filter((i) => ex.has(i.id) && !i.instOf), roots: [...sel], off: copyOffset(sel) }); toast('Copied'); } }
-  else if (e.ctrlKey && k === 'v') { if (!clip) return; commit(); const c = JSON.parse(clip), map = new Map(); sel.clear(); for (const i of c.items) { const o = i.id; i.id = uid(); i.x += (c.off || [24, 24])[0]; i.y += (c.off || [24, 24])[1]; delete i.master; map.set(o, i); } for (const i of map.values()) { if (map.has(i.go)) i.go = map.get(i.go).id; doc.items.push(i); } for (const r of c.roots) if (map.has(r)) sel.add(map.get(r).id); render(); }
+  else if (e.ctrlKey && k === 'c') { if (sel.size) { const ex = expand(sel), items = doc.items.filter((i) => ex.has(i.id) && !i.instOf); if (!items.length) { toast('Parts of an instance cannot be copied. Copy the whole instance instead.'); return; } clip = JSON.stringify({ items, roots: [...sel], off: copyOffset(sel) }); toast('Copied'); } }
+  else if (e.ctrlKey && k === 'v') { if (!clip) return; const c = JSON.parse(clip), map = new Map(); if (!c.items || !c.items.length) return; commit(); sel.clear(); for (const i of c.items) { const o = i.id; i.id = uid(); i.x += (c.off || [24, 24])[0]; i.y += (c.off || [24, 24])[1]; delete i.master; map.set(o, i); } for (const i of map.values()) { if (map.has(i.go)) i.go = map.get(i.go).id; doc.items.push(i); } for (const r of c.roots) if (map.has(r)) sel.add(map.get(r).id); render(); }
   else if (e.shiftKey && k === 'i') { if (offered('image')) pickImages(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') del();
   else if (e.key === 'Enter' && pen) { penFinish(false); }
