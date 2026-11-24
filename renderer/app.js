@@ -637,7 +637,21 @@ svg.addEventListener('pointermove', (ev) => {
   if (drag.mode === 'pencil') { const p = toW(ev), l = drag.abs[drag.abs.length - 1]; if (Math.hypot(p.x - l[0], p.y - l[1]) >= 2 / zoom) { drag.abs.push([p.x, p.y]); pathFit(drag.it, drag.abs); renderLite(); } return; }
   if (drag.mode === 'pan') { panX = drag.px + ev.clientX - drag.sx; panY = drag.py + ev.clientY - drag.sy; applyView(); return; }
   const p = toW(ev);
-  if (drag.mode === 'move') { const dx = p.x - drag.p.x, dy = p.y - drag.p.y; if (Math.abs(dx) + Math.abs(dy) > 0) drag.moved = true; for (const o of drag.orig) { o.m.x = Math.round(o.x + dx); o.m.y = Math.round(o.y + dy); } renderLite(); }
+  if (drag.mode === 'move') {
+    let dx = p.x - drag.p.x, dy = p.y - drag.p.y; if (Math.abs(dx) + Math.abs(dy) > 0) drag.moved = true;
+    const guides = [];
+    if (!ev.altKey) { // snap the moving group's edges/centres to other items' edges/centres
+      const ms = new Set(drag.orig.map((o) => o.m)); const others = doc.items.filter((c) => !ms.has(c) && !c.hidden && c.type !== 'line');
+      let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+      for (const o of drag.orig) { bx0 = Math.min(bx0, o.x); by0 = Math.min(by0, o.y); bx1 = Math.max(bx1, o.x + o.m.w); by1 = Math.max(by1, o.y + o.m.h); }
+      const th = 5 / zoom; const best = (mine, targets) => { let b = null; for (const m of mine) for (const t of targets) { const d = t - m; if (Math.abs(d) <= th && (!b || Math.abs(d) < Math.abs(b.d))) b = { d, at: t }; } return b; };
+      const xs = [], ys = []; for (const c of others) { xs.push(c.x, c.x + c.w / 2, c.x + c.w); ys.push(c.y, c.y + c.h / 2, c.y + c.h); }
+      const sx = best([bx0 + dx, (bx0 + bx1) / 2 + dx, bx1 + dx], xs), sy = best([by0 + dy, (by0 + by1) / 2 + dy, by1 + dy], ys);
+      if (sx) { dx += sx.d; guides.push({ v: true, at: sx.at }); } if (sy) { dy += sy.d; guides.push({ v: false, at: sy.at }); }
+    }
+    for (const o of drag.orig) { o.m.x = Math.round(o.x + dx); o.m.y = Math.round(o.y + dy); } renderLite();
+    for (const g of guides) gUI.append(sv('line', { class: 'sg', x1: g.v ? g.at : -1e5, x2: g.v ? g.at : 1e5, y1: g.v ? -1e5 : g.at, y2: g.v ? 1e5 : g.at, stroke: '#ff3d8b', 'stroke-width': 1 / zoom, 'pointer-events': 'none' }));
+  }
   else if (drag.mode === 'draw') {
     const i = drag.i; let w = p.x - drag.p.x, hh = p.y - drag.p.y;
     if (drag.tool === 'line') { i.x = drag.p.x; i.y = drag.p.y; i.w = w; i.h = hh; if (ev.shiftKey) { if (Math.abs(w) > Math.abs(hh)) i.h = 0; else i.w = 0; } }

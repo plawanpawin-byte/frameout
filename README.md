@@ -106,6 +106,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.28:** Snap and pink guide lines when you drag items (hold Alt to turn off).
+
 **1.0.27:** Auto keyframe in Motion mode.
 
 **1.0.26:** New design opens an empty, zoomed-out canvas with no size question (sizes are now a preset list in the frame's panel). Tools are grouped in dropdown menus like Figma, with new Arrow, Polygon, Star, Pen and Pencil tools, and four modes at the end of the bar: Draw, Design, Motion (keyframe timeline) and Dev (inspect, CSS, annotations).
