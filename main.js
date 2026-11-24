@@ -37,6 +37,12 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  // the page blocks closing while the design has changes that are not in a file; ask instead of doing nothing
+  win.webContents.on('will-prevent-unload', (e) => {
+    const c = dialog.showMessageBoxSync(win, { type: 'question', buttons: ['Close without saving', 'Cancel'], defaultId: 1, cancelId: 1, noLink: true, title: TITLE,
+      message: 'This design has changes that are not saved to a file.', detail: 'A copy is kept in Recent designs on the home screen.' });
+    if (c === 0) e.preventDefault();
+  });
   win.on('closed', () => { win = null; });
 }
 
