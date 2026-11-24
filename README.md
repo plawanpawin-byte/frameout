@@ -106,6 +106,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.32:** Parts of a component instance now move with the whole instance (with a short message if you try to move one alone). Hidden layers show no handles. Menus close when you press Tab. Clear recent stays cleared.
+
 **1.0.31:** New Google-style look: rounded panels, a Gemini-style home menu with Home, Recent, Starred, Templates, Settings and Help, new icons and dialogs. About 45 bug fixes (drag cancel, undo and redo, locked layers, big PNG export, empty text, shortcuts while typing, motion keys). Frameout asks before closing a design with unsaved changes.
 
 **1.0.30:** Folders are hidden from the home screen.
