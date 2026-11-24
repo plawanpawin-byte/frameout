@@ -146,7 +146,8 @@ function tbtn(label, ic, fn, cls = '', tip = label) {
   const b = h('button', { class: 'btn ' + cls, onclick: fn, title: tip, 'aria-label': label });
   const i = icon(ic, 20); i.classList.add('ic'); i.dataset.for = label; b.append(i, document.createTextNode(label)); return b;
 }
-const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', onfocus: (e) => { e.target.dataset.old = doc.title || ''; }, oninput: (e) => { doc.title = e.target.value; syncTitle(); }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; syncTitle(); } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { doc.title = e.target.dataset.old || doc.title; e.target.value = doc.title; syncTitle(); e.target.blur(); } } });
+const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', onfocus: () => { titleOld = doc.title || ''; }, onblur: () => { titleOld = null; }, oninput: (e) => { if (titleOld === null) titleOld = doc.title || ''; doc.title = e.target.value; syncTitle(); }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; syncTitle(); } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { doc.title = titleOld || doc.title; e.target.value = doc.title; syncTitle(); e.target.blur(); } } });
+let titleOld = null;   // the title before the current edit in the top bar, for Escape
 function syncTitle() { const r = document.querySelector('.rtitle'); if (r && r !== document.activeElement) r.value = doc.title; }
 const exportBtn = tbtn('Export', 'download', (e) => openMenu(e.currentTarget, 'export', [['image', 'Export PNG', () => exportImg('png')], ['code', 'Export SVG', () => exportImg('svg')]], e.detail === 0));
 exportBtn.dataset.menu = 'export'; exportBtn.setAttribute('aria-haspopup', 'menu');
@@ -368,7 +369,7 @@ function itemEl(i, forExport = false) {
   return g;
 }
 function render() {
-  if (document.activeElement !== titleInput) titleInput.value = doc.title || '';
+  if (document.activeElement !== titleInput) { titleInput.value = doc.title || ''; titleOld = null; }
   syncInstances(); applyLayouts(); syncRest();
   gItems.textContent = ''; gUI.textContent = '';
   for (const i of doc.items) gItems.append(itemEl(i));
@@ -388,7 +389,7 @@ function render() {
       for (const [k, [px, py]] of Object.entries(pts)) { const r = sv('rect', { x: px - 4 / zoom, y: py - 4 / zoom, width: 8 / zoom, height: 8 / zoom, fill: '#ffffff', stroke: '#222', 'stroke-width': 1 / zoom, style: `cursor:${cur[k]}${cur[k].length < 5 ? '-resize' : ''}` }); r.dataset.handle = k; gUI.append(r); }
     }
   }
-  applyView(); renderLeft(); renderRight(); if (!noTl) renderTimeline();
+  applyView(); if (!lite) renderLeft(); renderRight(); if (!noTl) renderTimeline();
 }
 function renderStatus() { status.textContent = ''; status.append(h('span', { text: fileName || 'Not saved to a file yet' }), h('span', { class: 'grow' }), h('span', { text: doc.items.length + ' layers' })); zoomPct.textContent = Math.round(zoom * 100) + '%'; }
 // NotebookLM-style panel header: title + a round button that folds the panel away (kit.js grip brings it back)
@@ -693,7 +694,7 @@ svg.addEventListener('pointerdown', (ev) => {
   if (tool === 'pen') { penAdd(p); return; }
   if (tool === 'pencil') { commit(); const it = makeItem('path', p.x, p.y, 1, 1); it.sm = true; it.pts = [[0, 0]]; doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'pencil', it, abs: [[p.x, p.y]] }; render(); return; }
   const hd = mode === 'dev' ? null : ev.target.dataset.handle;
-  if (hd) { const i = get([...sel][0]); commit(); drag = { mode: 'resize', hd, i, o: { ...i }, p }; return; }
+  if (hd) { const i = get([...sel][0]); const redo0 = redoS; commit(); drag = { mode: 'resize', hd, i, o: { ...i }, p, redo0 }; return; }
   if (tool !== 'select' && mode !== 'dev') { commit(); const ty = tool === 'arrow' ? 'line' : tool; const it = makeItem(ty, p.x, p.y, 1, 1); if (tool === 'arrow') { it.ah = true; it.name = 'Arrow ' + (doc.items.filter((x) => x.type === 'line' && x.ah).length + 1); } if (tool === 'text') { it.w = 80; } doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'draw', i: it, p, tool: ty }; render(); return; }
   const node = ev.target.closest('[data-id]');
   let id = node ? node.dataset.id : null; let it = id && get(id);
@@ -708,8 +709,8 @@ svg.addEventListener('pointerdown', (ev) => {
   if (it) {
     if (ev.shiftKey) { sel.has(it.id) ? sel.delete(it.id) : sel.add(it.id); } else if (!sel.has(it.id)) sel = new Set([it.id]);
     const moving = [];
-    for (const id2 of sel) { const m = get(id2); moving.push(m); if (m.type === 'frame') doc.items.filter((c) => inside(c, m) && !sel.has(c.id)).forEach((c) => moving.push(c)); }
-    commit(); drag = { mode: 'move', p, orig: [...new Set(moving)].map((m) => ({ m, x: m.x, y: m.y })), moved: false }; render();
+    for (const id2 of sel) { const m = get(id2); if (!m || m.locked) continue; moving.push(m); if (m.type === 'frame') doc.items.filter((c) => inside(c, m) && !sel.has(c.id)).forEach((c) => moving.push(c)); }
+    const redo0 = redoS; commit(); drag = { mode: 'move', p, orig: [...new Set(moving)].map((m) => ({ m, x: m.x, y: m.y })), moved: false, redo0 }; render();
   } else { if (!ev.shiftKey) sel.clear(); const r = sv('rect', { fill: 'rgba(200,200,200,.12)', stroke: '#bdbdbd', 'stroke-dasharray': '4 3', 'stroke-width': 1 / zoom }); drag = { mode: 'marquee', p, r }; render(); gUI.append(r); }
 });
 svg.addEventListener('pointermove', (ev) => {
@@ -755,12 +756,13 @@ svg.addEventListener('pointermove', (ev) => {
     ['x', 'y', 'width', 'height'].forEach((a, k) => drag.r.setAttribute(a, [x, y, w, hh][k])); drag.box = { x, y, w, h: hh };
   }
 });
-function renderLite() { renderItemsOnly(); render(); }
+let lite = false;
+function renderLite() { lite = true; try { render(); } finally { lite = false; } }
 // Escape (or a lost pointer) during a drag: put everything back as it was when the drag began
 function cancelDrag() {
   if (!drag) return false; const d = drag; drag = null;
   if (d.mode === 'marquee') d.r.remove();
-  else if (d.mode !== 'pan' && undoS.length) { doc = JSON.parse(undoS.pop()); sel = new Set([...sel].filter((id) => get(id))); if (d.mode === 'draw' || d.mode === 'pencil') setTool('select'); }
+  else if (d.mode !== 'pan' && undoS.length) { doc = JSON.parse(undoS.pop()); if (d.redo0) redoS = d.redo0; sel = new Set([...sel].filter((id) => get(id))); if (d.mode === 'draw' || d.mode === 'pencil') setTool('select'); }
   render(); return true;
 }
 svg.addEventListener('pointercancel', cancelDrag);
@@ -774,8 +776,8 @@ svg.addEventListener('pointerup', () => {
     if (d.tool === 'text') { i.w = 80; i.h = 24; focusText = true; }
     else if ((d.tool !== 'line' && (i.w < 4 || i.h < 4)) || (d.tool === 'line' && Math.abs(i.w) + Math.abs(i.h) < 4)) { if (d.tool === 'line') { i.w = 120; i.h = 0; } else { i.w = d.tool === 'frame' ? 375 : 120; i.h = d.tool === 'frame' ? 667 : d.tool === 'polygon' || d.tool === 'star' ? 120 : 80; } }
     setTool('select'); render();
-  } else if (d.mode === 'move' && !d.moved) { undoS.pop(); render(); }
-  else if (d.mode === 'marquee') { d.r.remove(); if (d.box && d.box.w > 3) for (const i of doc.items) { const b = bb(i); if (!i.hidden && b.x < d.box.x + d.box.w && b.x + b.w > d.box.x && b.y < d.box.y + d.box.h && b.y + b.h > d.box.y && i.type !== 'frame') sel.add(i.id); } render(); }
+  } else if ((d.mode === 'move' && !d.moved) || (d.mode === 'resize' && ['x', 'y', 'w', 'h'].every((k) => d.i[k] === d.o[k]))) { undoS.pop(); redoS = d.redo0; render(); }
+  else if (d.mode === 'marquee') { d.r.remove(); if (d.box && (d.box.w > 3 || d.box.h > 3)) for (const i of doc.items) { const b = bb(i); if (!i.hidden && !i.locked && b.x < d.box.x + d.box.w && b.x + b.w > d.box.x && b.y < d.box.y + d.box.h && b.y + b.h > d.box.y && i.type !== 'frame') sel.add(i.id); } render(); }
   else render();
 });
 svg.addEventListener('wheel', (ev) => { ev.preventDefault(); const r = svg.getBoundingClientRect(); if (ev.ctrlKey || ev.metaKey) zoomBy(ev.deltaY < 0 ? 1.1 : 1 / 1.1, ev.clientX - r.left, ev.clientY - r.top); else { panX -= ev.deltaX; panY -= ev.deltaY; applyView(); } }, { passive: false });
@@ -789,20 +791,21 @@ document.addEventListener('keydown', (e) => {
   if (e.target.matches('input,textarea,select')) return;
   if (document.querySelector('.modal-back') || (!e.ctrlKey && !e.metaKey && e.target.matches('button,[contenteditable]'))) return;
   const k = e.key.toLowerCase();
+  if (mode === 'dev' && ((e.ctrlKey && (k === 'd' || k === 'v')) || e.key === 'Delete' || e.key === 'Backspace' || e.key.startsWith('Arrow'))) return;
   if (e.code === 'Space') { spaceDown = true; e.preventDefault(); }
   else if (e.ctrlKey && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
   else if (e.ctrlKey && k === 'y') { e.preventDefault(); redo(); }
   else if (e.ctrlKey && k === 'd') { e.preventDefault(); dupe(); }
   else if (e.ctrlKey && k === 's') { e.preventDefault(); saveDoc(); }
   else if (e.ctrlKey && k === 'o') { e.preventDefault(); openDoc(); }
-  else if (e.ctrlKey && k === 'a') { e.preventDefault(); sel = new Set(doc.items.map((i) => i.id)); render(); }
+  else if (e.ctrlKey && k === 'a') { e.preventDefault(); sel = new Set(doc.items.filter((i) => !i.locked).map((i) => i.id)); render(); }
   else if (e.ctrlKey && k === 'c') { if (sel.size) { const ex = expand(sel); clip = JSON.stringify({ items: doc.items.filter((i) => ex.has(i.id) && !i.instOf), roots: [...sel], off: copyOffset(sel) }); toast('Copied'); } }
   else if (e.ctrlKey && k === 'v') { if (!clip) return; commit(); const c = JSON.parse(clip), map = new Map(); sel.clear(); for (const i of c.items) { const o = i.id; i.id = uid(); i.x += (c.off || [24, 24])[0]; i.y += (c.off || [24, 24])[1]; delete i.master; map.set(o, i); } for (const i of map.values()) { if (map.has(i.go)) i.go = map.get(i.go).id; doc.items.push(i); } for (const r of c.roots) if (map.has(r)) sel.add(map.get(r).id); render(); }
   else if (e.shiftKey && k === 'i') { if (offered('image')) pickImages(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') del();
   else if (e.key === 'Enter' && pen) { penFinish(false); }
   else if (e.key === 'Escape') { if (fly) { closeFly(); return; } if (cancelDrag()) return; if (pen) { penFinish(false); return; } sel.clear(); setTool('select'); render(); }
-  else if (e.key.startsWith('Arrow') && sel.size) { e.preventDefault(); const d = e.shiftKey ? 10 : 1; commit(); doc.items.filter((i) => sel.has(i.id)).forEach((i) => { if (e.key === 'ArrowLeft') i.x -= d; if (e.key === 'ArrowRight') i.x += d; if (e.key === 'ArrowUp') i.y -= d; if (e.key === 'ArrowDown') i.y += d; }); autoKeyFor(doc.items.filter((i) => sel.has(i.id))); render(); }
+  else if (e.key.startsWith('Arrow') && sel.size) { e.preventDefault(); const d = e.shiftKey ? 10 : 1; commit(); doc.items.filter((i) => sel.has(i.id) && !i.locked).forEach((i) => { if (e.key === 'ArrowLeft') i.x -= d; if (e.key === 'ArrowRight') i.x += d; if (e.key === 'ArrowUp') i.y -= d; if (e.key === 'ArrowDown') i.y += d; }); autoKeyFor(doc.items.filter((i) => sel.has(i.id) && !i.locked)); render(); }
   else if (!e.ctrlKey && e.shiftKey && (k === 'l' || k === 'p')) { const t = k === 'l' ? 'arrow' : 'pencil'; if (offered(t)) setTool(t); }
   else if (!e.ctrlKey && 'vhfrolpt'.includes(k) && k.length === 1) { const t = { v: 'select', h: 'hand', f: 'frame', r: 'rect', o: 'ellipse', l: 'line', p: 'pen', t: 'text' }[k]; if (offered(t)) setTool(t); }
 });
@@ -863,10 +866,16 @@ function exportSvgString(forced) {
 async function exportImg(kind) {
   const r = exportSvgString(); if (!r) { toast('Nothing to export'); return; }
   if (kind === 'svg') { const s = await window.host.saveFile({ name: (doc.title || 'design') + '.svg', filters: [['SVG', ['svg']]], data: new TextEncoder().encode(r.str) }); if (s) toast('Saved ' + s.name); return; }
-  const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(r.str); await img.decode();
-  const sc = r.w > 3000 ? 1 : 2; const cv = document.createElement('canvas'); cv.width = Math.round(r.w * sc); cv.height = Math.round(r.h * sc); const ctx = cv.getContext('2d'); ctx.scale(sc, sc); ctx.drawImage(img, 0, 0, r.w, r.h);
-  const blob = await new Promise((x) => cv.toBlob(x, 'image/png'));
-  const s = await window.host.saveFile({ name: (doc.title || 'design') + '.png', filters: [['PNG image', ['png']]], data: new Uint8Array(await blob.arrayBuffer()) }); if (s) toast('Saved ' + s.name);
+  // a canvas has size limits; very large designs are scaled down to fit (at most 16000 px a side, 64 million pixels)
+  const sc = Math.min(r.w > 3000 ? 1 : 2, 16000 / r.w, 16000 / r.h, Math.sqrt(64e6 / (r.w * r.h)));
+  let blob = null;
+  try {
+    const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(r.str); await img.decode();
+    const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(r.w * sc)); cv.height = Math.max(1, Math.round(r.h * sc)); const ctx = cv.getContext('2d'); ctx.scale(sc, sc); ctx.drawImage(img, 0, 0, r.w, r.h);
+    blob = await new Promise((x) => cv.toBlob(x, 'image/png'));
+  } catch (e) { blob = null; }
+  if (!blob) { toast('Could not make the PNG. Try exporting one frame.'); return; }
+  const s = await window.host.saveFile({ name: (doc.title || 'design') + '.png', filters: [['PNG image', ['png']]], data: new Uint8Array(await blob.arrayBuffer()) }); if (s) toast('Saved ' + s.name + (sc < 1 ? ' (scaled down to fit)' : ''));
 }
 
 // sample: two linked screens
