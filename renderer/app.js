@@ -56,13 +56,15 @@ const snapshot = () => JSON.stringify(doc);
 // what a saved file holds (animated layers at rest), so a moved playhead is not an unsaved change
 const fileSnap = () => JSON.stringify(restDoc());
 let shownText = null;   // the text layer last edited in the Text box (see dropEmptyText)
-function commit() { undoS.push(snapshot()); if (undoS.length > 100) undoS.shift(); redoS = []; }
+// restEdit: a real change was made since the last full render, so animated layers may need their keys moved (syncRest)
+let restEdit = false;
+function commit() { undoS.push(snapshot()); if (undoS.length > 100) undoS.shift(); redoS = []; restEdit = true; }
 // a pen path or a mouse drag in progress belongs to the history step being undone, so end it first
 function endOps() { if (drag) { if (drag.r) drag.r.remove(); drag = null; } if (pen) { pen = null; setTool('select'); } }
 // after undo/redo: keep the selected layers that still exist; outside Motion mode put animated layers at time 0
 function restPose() { sel = new Set([...sel].filter((id) => get(id))); if (mode !== 'motion') applyPose(0); }
-function undo() { endOps(); if (!undoS.length) return; redoS.push(snapshot()); doc = JSON.parse(undoS.pop()); restPose(); render(); }
-function redo() { endOps(); if (!redoS.length) return; undoS.push(snapshot()); doc = JSON.parse(redoS.pop()); restPose(); render(); }
+function undo() { endOps(); if (!undoS.length) return; redoS.push(snapshot()); doc = JSON.parse(undoS.pop()); restEdit = false; restPose(); render(); }
+function redo() { endOps(); if (!redoS.length) return; undoS.push(snapshot()); doc = JSON.parse(redoS.pop()); restEdit = false; restPose(); render(); }
 const get = (id) => doc.items.find((i) => i.id === id);
 const FILLS = ['#ffffff', '#e4e4e4', '#bdbdbd', '#8a8a8a', '#4a4a4a', '#262626', '#d9e0e6', '#e6e0d2', '#dce6dc', '#e8d9d9'];
 const NAMES = { frame: 'Frame', rect: 'Rectangle', ellipse: 'Ellipse', text: 'Text', line: 'Line', image: 'Image', polygon: 'Polygon', star: 'Star', path: 'Path' };
@@ -373,7 +375,7 @@ function itemEl(i, forExport = false) {
 }
 function render() {
   if (document.activeElement !== titleInput) { titleInput.value = doc.title || ''; titleOld = null; }
-  dropEmptyText(); syncInstances(); applyLayouts(); syncRest();
+  dropEmptyText(); syncInstances(); applyLayouts(); if (restEdit) { syncRest(); if (!drag) restEdit = false; }
   gItems.textContent = ''; gUI.textContent = '';
   for (const i of doc.items) gItems.append(itemEl(i));
   for (const id of sel) {
@@ -538,15 +540,24 @@ function applyPose(t) { if (!hasMotion()) return; for (const id of Object.keys(d
 // what is written to a file: every animated layer at time 0 (its resting place), not wherever the playhead happens to be
 function restDoc() {
   if (!hasMotion()) return doc;
-  const c = JSON.parse(JSON.stringify(doc)); for (const id of Object.keys(c.motion.tracks)) { const it = c.items.find((x) => x.id === id), k = c.motion.tracks[id]; if (it && k.length) { const p = poseOf(k, 0); for (const key of KEYS) it[key] = p[key]; } } return c;
+  const c = JSON.parse(JSON.stringify(doc)); for (const id of Object.keys(c.motion.tracks)) { const it = c.items.find((x) => x.id === id), k = c.motion.tracks[id]; if (it && k.length) { const p = poseOf(k, 0); for (const key of KEYS) it[key] = key === 'op' ? clamp(p.op, 0.05, 1) : p[key]; } } return c;
 }
 // outside Motion mode an animated layer shows its time-0 pose; if it was moved or changed there (Design mode,
-// layer panel, align...), shift all its keyframes by the same amount so the change is kept and the animation follows
+// layer panel, align...), shift all its keyframes by the same amount so the change is kept and the animation follows.
+// render() runs this only after a real edit (restEdit), never on opening a design. What an auto-layout frame sets
+// (a child's place, a hugging frame's size) is not an edit. Opacity keys are not cut to 0..1 here (the pose shown is),
+// so raising and lowering opacity again gives the same keys back.
 function syncRest() {
   if (mode === 'motion' || playing || !hasMotion()) return;
   for (const id of Object.keys(doc.motion.tracks)) {
     const it = get(id), k = doc.motion.tracks[id]; if (!it || !k.length) continue; const p = poseOf(k, 0);
-    for (const key of KEYS) { const cur = key === 'rot' ? it.rot || 0 : it[key], want = key === 'op' ? clamp(p.op, 0.05, 1) : p[key], d = cur - want; if (Number.isFinite(d) && Math.abs(d) > 1e-6) for (const e of k) e[key] = key === 'op' ? clamp(e[key] + d, 0.05, 1) : e[key] + d; }
+    const pf = it.hidden ? null : parentFrame(it), placed = !!(pf && pf.al && pf.al.dir), hugs = !!(it.type === 'frame' && it.al && it.al.dir && it.al.hug && directKids(it).length);
+    for (const key of KEYS) {
+      if ((placed && (key === 'x' || key === 'y')) || (hugs && (key === 'w' || key === 'h'))) continue;
+      const cur = key === 'rot' ? it.rot || 0 : it[key], shown = key === 'op' ? clamp(p.op, 0.05, 1) : p[key];
+      if (!Number.isFinite(cur - shown) || Math.abs(cur - shown) <= 1e-6) continue;
+      const d = cur - p[key]; if (Number.isFinite(d)) for (const e of k) e[key] += d;
+    }
   }
 }
 // a shorter duration cuts each track at the new end: keys after it go, and a key at the end keeps the pose it had there
@@ -990,7 +1001,7 @@ function newBlank(target) {
 }
 function endSession() { if (pen) penFinish(false); endOps(); if (playing) stopPlay(); }
 function startDesign(d, bind) { endSession(); if (mode !== 'design') { mode = 'design'; buildDock(); } playhead = 0; autosave(); fileBind = bind || null; doc = d; sel.clear();
-  if (doc.motion) { for (const id of Object.keys(doc.motion.tracks)) if (!get(id)) delete doc.motion.tracks[id]; applyPose(0); } undoS = []; redoS = []; fileName = ''; savedSnap = fileSnap(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
+  if (doc.motion) { for (const id of Object.keys(doc.motion.tracks)) if (!get(id)) delete doc.motion.tracks[id]; applyPose(0); } undoS = []; redoS = []; restEdit = false; fileName = ''; savedSnap = fileSnap(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
 function openRecent(e) {
   try { const d = JSON.parse(e.doc); if (!Array.isArray(d.items)) throw new Error('damaged'); startDesign({ id: e.id, title: String(d.title || e.title || 'Untitled design'), items: d.items.map(cleanItem), motion: cleanMotion(d.motion) }); }
   catch (err) { toast('Cannot open this design'); }
