@@ -53,6 +53,8 @@ let doc = { id: uid(), title: 'Untitled design', items: [] };
 let sel = new Set(), tool = 'select', zoom = 1, panX = 0, panY = 0, fileName = '';
 let undoS = [], redoS = [], clip = null, preview = null;
 const snapshot = () => JSON.stringify(doc);
+// what a saved file holds (animated layers at rest), so a moved playhead is not an unsaved change
+const fileSnap = () => JSON.stringify(restDoc());
 function commit() { undoS.push(snapshot()); if (undoS.length > 100) undoS.shift(); redoS = []; }
 // a pen path or a mouse drag in progress belongs to the history step being undone, so end it first
 function endOps() { if (drag) { if (drag.r) drag.r.remove(); drag = null; } if (pen) { pen = null; setTool('select'); } }
@@ -528,6 +530,14 @@ function syncRest() {
     for (const key of KEYS) { const cur = key === 'rot' ? it.rot || 0 : it[key], want = key === 'op' ? clamp(p.op, 0.05, 1) : p[key], d = cur - want; if (Number.isFinite(d) && Math.abs(d) > 1e-6) for (const e of k) e[key] = key === 'op' ? clamp(e[key] + d, 0.05, 1) : e[key] + d; }
   }
 }
+// a shorter duration cuts each track at the new end: keys after it go, and a key at the end keeps the pose it had there
+function trimKeys(m) {
+  for (const id of Object.keys(m.tracks)) {
+    const k = m.tracks[id]; if (!k.length || k[k.length - 1].t <= m.dur) continue;
+    const p = poseOf(k, m.dur), e = { t: m.dur, e: (k.find((x) => x.t > m.dur) || {}).e || 'linear' }; for (const key of KEYS) e[key] = p[key];
+    m.tracks[id] = k.filter((x) => x.t < m.dur).concat(e);
+  }
+}
 function keyAt(it) {
   const m = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); const k = m.tracks[it.id] || (m.tracks[it.id] = []);
   for (let n = k.length - 1; n >= 0; n--) if (Math.abs(k[n].t - playhead) < 20) k.splice(n, 1);
@@ -572,7 +582,7 @@ function renderTimeline() {
     for (const e of m.tracks[id]) lane.append(h('button', { class: 'kfd' + (sel.has(id) && Math.abs(e.t - playhead) < 20 ? ' on' : ''), style: `left:${(e.t / m.dur) * 100}%`, title: it.name + ' at ' + fmtT(e.t), 'aria-label': 'Keyframe at ' + fmtT(e.t), onclick: () => { sel = new Set([id]); playhead = e.t; scrub(); renderTimeline(); } }, dockIcon('keyf', 10)));
     return h('div', { class: 'trk' }, h('span', { class: 'trn', text: it.name }), lane);
   });
-  tl.append(h('div', { class: 'tlh' }, play, time, h('label', { class: 'tlf' }, 'Duration (s)', h('input', { type: 'number', min: 0.2, max: 60, step: 0.5, value: m.dur / 1000, style: 'width:64px', onchange: (ev) => { const v = +ev.target.value; if (!(v >= 0.2 && v <= 60)) { ev.target.value = m.dur / 1000; return; } commit(); const mm = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); mm.dur = Math.round(v * 1000); if (playhead > mm.dur) playhead = mm.dur; render(); } })),
+  tl.append(h('div', { class: 'tlh' }, play, time, h('label', { class: 'tlf' }, 'Duration (s)', h('input', { type: 'number', min: 0.2, max: 60, step: 0.5, value: m.dur / 1000, style: 'width:64px', onchange: (ev) => { const v = +ev.target.value; if (!(v >= 0.2 && v <= 60)) { ev.target.value = m.dur / 1000; return; } commit(); const mm = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); mm.dur = Math.round(v * 1000); trimKeys(mm); if (playhead > mm.dur) playhead = mm.dur; render(); } })),
     h('label', { class: 'tlf' }, h('input', { type: 'checkbox', 'aria-label': 'Auto keyframe', checked: autoKey, onchange: (ev) => { autoKey = ev.target.checked; } }), 'Auto keyframe'), h('label', { class: 'tlf' }, h('input', { type: 'checkbox', checked: !!m.loop, onchange: (ev) => { commit(); const mm = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); mm.loop = ev.target.checked; } }), 'Loop'), h('span', { class: 'tlf' }, 'Easing', ease), btn('Add keyframe', addKey, 'primary'), btn('Delete keyframe', delKey)), range,
     h('div', { class: 'tracks' }, tracks.length ? tracks : h('div', { class: 'muted', style: 'padding:6px 4px;font-size:12px', text: 'Select a layer, put the playhead on a time, press Add keyframe. Move the playhead, change the layer (position, size, rotation or opacity) and add another keyframe.' })));
   tlRefs = { time, range, play, phs }; updateTl();
@@ -704,10 +714,10 @@ svg.addEventListener('pointerdown', (ev) => {
   const p = toW(ev);
   if (playing) { stopPlay(); return; }
   if (tool === 'pen') { penAdd(p); return; }
-  if (tool === 'pencil') { commit(); const it = makeItem('path', p.x, p.y, 1, 1); it.sm = true; it.pts = [[0, 0]]; doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'pencil', it, abs: [[p.x, p.y]] }; render(); return; }
+  if (tool === 'pencil') { const redo0 = redoS; commit(); const it = makeItem('path', p.x, p.y, 1, 1); it.sm = true; it.pts = [[0, 0]]; doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'pencil', it, abs: [[p.x, p.y]], redo0 }; render(); return; }
   const hd = mode === 'dev' ? null : ev.target.dataset.handle;
   if (hd) { const i = get([...sel][0]); const redo0 = redoS; commit(); drag = { mode: 'resize', hd, i, o: { ...i }, p, redo0 }; return; }
-  if (tool !== 'select' && mode !== 'dev') { commit(); const ty = tool === 'arrow' ? 'line' : tool; const it = makeItem(ty, p.x, p.y, 1, 1); if (tool === 'arrow') { it.ah = true; it.name = 'Arrow ' + (doc.items.filter((x) => x.type === 'line' && x.ah).length + 1); } if (tool === 'text') { it.w = 80; } doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'draw', i: it, p, tool: ty }; render(); return; }
+  if (tool !== 'select' && mode !== 'dev') { const redo0 = redoS; commit(); const ty = tool === 'arrow' ? 'line' : tool; const it = makeItem(ty, p.x, p.y, 1, 1); if (tool === 'arrow') { it.ah = true; it.name = 'Arrow ' + (doc.items.filter((x) => x.type === 'line' && x.ah).length + 1); } if (tool === 'text') { it.w = 80; } doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'draw', i: it, p, tool: ty, redo0 }; render(); return; }
   const node = ev.target.closest('[data-id]');
   let id = node ? node.dataset.id : null; let it = id && get(id);
   if (it && it.locked) { it = null; }
@@ -722,6 +732,7 @@ svg.addEventListener('pointerdown', (ev) => {
     if (ev.shiftKey) { sel.has(it.id) ? sel.delete(it.id) : sel.add(it.id); } else if (!sel.has(it.id)) sel = new Set([it.id]);
     const moving = [];
     for (const id2 of sel) { const m = get(id2); if (!m || m.locked) continue; moving.push(m); if (m.type === 'frame') doc.items.filter((c) => inside(c, m) && !sel.has(c.id)).forEach((c) => moving.push(c)); }
+    if (!moving.length) { render(); return; } // only locked layers: select them, nothing to move
     const redo0 = redoS; commit(); drag = { mode: 'move', p, orig: [...new Set(moving)].map((m) => ({ m, x: m.x, y: m.y })), moved: false, redo0 }; render();
   } else { if (!ev.shiftKey) sel.clear(); const r = sv('rect', { fill: 'rgba(200,200,200,.12)', stroke: '#bdbdbd', 'stroke-dasharray': '4 3', 'stroke-width': 1 / zoom }); drag = { mode: 'marquee', p, r }; render(); gUI.append(r); }
 });
@@ -782,7 +793,7 @@ window.addEventListener('blur', () => { spaceDown = false; });
 svg.addEventListener('pointerup', () => {
   if (!drag) return; const d = drag; drag = null;
   if ((d.mode === 'move' && d.moved) || d.mode === 'resize') autoKeyFor([...sel].map(get));
-  if (d.mode === 'pencil') { if (d.abs.length < 2) { doc.items = doc.items.filter((x) => x !== d.it); undoS.pop(); sel.clear(); } setTool('select'); render(); return; }
+  if (d.mode === 'pencil') { if (d.abs.length < 2) { doc.items = doc.items.filter((x) => x !== d.it); undoS.pop(); if (d.redo0) redoS = d.redo0; sel.clear(); } setTool('select'); render(); return; }
   if (d.mode === 'draw') {
     const i = d.i;
     if (d.tool === 'text') { i.w = 80; i.h = 24; focusText = true; }
@@ -825,8 +836,8 @@ document.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = 
 
 // ---------- prototype preview ----------
 function startPreview() {
-  endSession();
   const frames = doc.items.filter((f) => f.type === 'frame' && !f.hidden); if (!frames.length) { toast('Add a frame first'); return; }
+  endSession();
   const s0 = sel.size ? get([...sel][0]) : null, start = s0 && s0.type === 'frame' && !s0.hidden ? s0 : frames[0];
   const back = h('div', { class: 'modal-back pv', style: 'flex-direction:column;gap:16px' });
   preview = { back, frame: start, hist: [], hot: false };
@@ -863,9 +874,9 @@ async function openDoc(dropped) {
   catch (e) { toast('Cannot open: ' + e.message); }
 }
 async function saveDoc() {
-  const bytes = new TextEncoder().encode(JSON.stringify(restDoc(), null, 1));
-  if (fileBind) { try { const n = await window.host.folders.save(fileBind.key, fileBind.name, bytes, true); savedSnap = snapshot(); toast('Saved ' + n + ' in ' + fileBind.folder); renderStatus(); } catch (e) { fileBind = null; toast('Could not save to the folder. Choose another place.'); return saveDoc(); } return; }
-  const r = await window.host.saveFile({ name: (doc.title || 'design') + '.frameout', filters: [['Frameout design', ['frameout']]], data: bytes }); if (r) { savedSnap = snapshot(); fileName = r.name; toast('Saved ' + r.name); renderStatus(); } }
+  const snap = fileSnap(), bytes = new TextEncoder().encode(JSON.stringify(JSON.parse(snap), null, 1)); // savedSnap is what went into the file
+  if (fileBind) { try { const n = await window.host.folders.save(fileBind.key, fileBind.name, bytes, true); savedSnap = snap; toast('Saved ' + n + ' in ' + fileBind.folder); renderStatus(); } catch (e) { fileBind = null; toast('Could not save to the folder. Choose another place.'); return saveDoc(); } return; }
+  const r = await window.host.saveFile({ name: (doc.title || 'design') + '.frameout', filters: [['Frameout design', ['frameout']]], data: bytes }); if (r) { savedSnap = snap; fileName = r.name; toast('Saved ' + r.name); renderStatus(); } }
 function exportTarget(forced) { const f = forced || (sel.size === 1 ? get([...sel][0]) : null); if (f && f.type === 'frame') return { f, only: doc.items.filter((i) => i === f || inside(i, f)) }; const all = doc.items.filter((i) => !i.hidden); if (!all.length) return null; const B = all.map(bb), x0 = Math.min(...B.map((b) => b.x)), y0 = Math.min(...B.map((b) => b.y)), x1 = Math.max(...B.map((b) => b.x + b.w)), y1 = Math.max(...B.map((b) => b.y + b.h)); return { f: { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) }, only: all }; }
 function exportSvgString(forced) {
   const t = exportTarget(forced); if (!t) return null; const { f, only } = t;
@@ -942,7 +953,7 @@ function newBlank(target) {
 }
 function endSession() { if (pen) penFinish(false); endOps(); if (playing) stopPlay(); }
 function startDesign(d, bind) { endSession(); if (mode !== 'design') { mode = 'design'; buildDock(); } playhead = 0; autosave(); fileBind = bind || null; doc = d; sel.clear();
-  if (doc.motion) { for (const id of Object.keys(doc.motion.tracks)) if (!get(id)) delete doc.motion.tracks[id]; applyPose(0); } undoS = []; redoS = []; fileName = ''; savedSnap = snapshot(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
+  if (doc.motion) { for (const id of Object.keys(doc.motion.tracks)) if (!get(id)) delete doc.motion.tracks[id]; applyPose(0); } undoS = []; redoS = []; fileName = ''; savedSnap = fileSnap(); lastSaved = ''; session = true; closeHome(); render(); fit(); }
 function openRecent(e) {
   try { const d = JSON.parse(e.doc); if (!Array.isArray(d.items)) throw new Error('damaged'); startDesign({ id: e.id, title: String(d.title || e.title || 'Untitled design'), items: d.items.map(cleanItem), motion: cleanMotion(d.motion) }); }
   catch (err) { toast('Cannot open this design'); }
@@ -1075,7 +1086,7 @@ function addFolder() {
 async function removeFolder(p) { const fo = folders.find((x) => x.path === p); if (!confirm('Delete the folder "' + (fo ? fo.name : '') + '" and the designs in it? They go to the Recycle Bin.')) return; folders = await window.host.folders.remove(p); homeTab = 'home'; renderHome(); }
 async function importInto(key) { try { const n = await window.host.folders.import(key); if (n) toast(n === 1 ? 'Added 1 file' : 'Added ' + n + ' files'); } catch (e) { toast('Could not add files'); } loadFolderFiles(key); }
 function openFromFolder(key, folderName, f) { const d = { id: f.doc.id, title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })), motion: f.doc.motion }; startDesign(d, { key, name: f.name, folder: folderName }); }
-async function newInFolder(key, folderName, d) { const bytes = new TextEncoder().encode(JSON.stringify(d, null, 1)); try { const n = await window.host.folders.save(key, d.title + '.frameout', bytes, false); fileBind = { key, name: n, folder: folderName }; savedSnap = snapshot(); } catch (e) { toast('Could not save into the folder'); } }
+async function newInFolder(key, folderName, d) { const bytes = new TextEncoder().encode(JSON.stringify(d, null, 1)); try { const n = await window.host.folders.save(key, d.title + '.frameout', bytes, false); fileBind = { key, name: n, folder: folderName }; savedSnap = fileSnap(); } catch (e) { toast('Could not save into the folder'); } }
 function fileCard(f, fn, extra) { return h('div', { class: 'hcard', tabindex: 0, role: 'button', onclick: fn, onkeydown: (ev) => { if (ev.key === 'Enter') fn(); } }, thumbBox(f.svg), h('div', { class: 'hname', text: f.doc.title }), h('div', { class: 'hsub', text: f.name + ' · ' + ago(f.mtime) }), extra || null); }
 function homeFolder(key) {
   const fo = folders.find((x) => x.path === key);
@@ -1128,5 +1139,6 @@ window.addEventListener('drop', async (e) => {
 });
 
 let savedSnap = null;
-setTimeout(() => { if (savedSnap === null) savedSnap = snapshot(); }, 0);
-window.addEventListener('beforeunload', (e) => { if (savedSnap !== null && snapshot() !== savedSnap) { e.preventDefault(); e.returnValue = ''; } });
+setTimeout(() => { if (savedSnap === null) savedSnap = fileSnap(); }, 0);
+// an empty design is not held back: there is nothing to lose, and autosave keeps no copy of it in Recent
+window.addEventListener('beforeunload', (e) => { if (savedSnap !== null && doc.items.length && fileSnap() !== savedSnap) { e.preventDefault(); e.returnValue = ''; } });
