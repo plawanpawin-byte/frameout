@@ -54,8 +54,10 @@ let sel = new Set(), tool = 'select', zoom = 1, panX = 0, panY = 0, fileName = '
 let undoS = [], redoS = [], clip = null, preview = null;
 const snapshot = () => JSON.stringify(doc);
 function commit() { undoS.push(snapshot()); if (undoS.length > 100) undoS.shift(); redoS = []; }
-function undo() { if (!undoS.length) return; redoS.push(snapshot()); doc = JSON.parse(undoS.pop()); sel.clear(); render(); }
-function redo() { if (!redoS.length) return; undoS.push(snapshot()); doc = JSON.parse(redoS.pop()); sel.clear(); render(); }
+// a pen path or a mouse drag in progress belongs to the history step being undone, so end it first
+function endOps() { if (drag) { if (drag.r) drag.r.remove(); drag = null; } if (pen) { pen = null; setTool('select'); } }
+function undo() { endOps(); if (!undoS.length) return; redoS.push(snapshot()); doc = JSON.parse(undoS.pop()); sel.clear(); render(); }
+function redo() { endOps(); if (!redoS.length) return; undoS.push(snapshot()); doc = JSON.parse(redoS.pop()); sel.clear(); render(); }
 const get = (id) => doc.items.find((i) => i.id === id);
 const FILLS = ['#ffffff', '#e4e4e4', '#bdbdbd', '#8a8a8a', '#4a4a4a', '#262626', '#d9e0e6', '#e6e0d2', '#dce6dc', '#e8d9d9'];
 const NAMES = { frame: 'Frame', rect: 'Rectangle', ellipse: 'Ellipse', text: 'Text', line: 'Line', image: 'Image', polygon: 'Polygon', star: 'Star', path: 'Path' };
@@ -73,6 +75,8 @@ function makeItem(type, x, y, w, hh) {
   return base;
 }
 // a frame can only sit inside a bigger frame, so a frame that shrank (hug) never becomes a child of its own child
+// the box a layer covers; a line drawn leftwards or upwards has a negative width or height
+const bb = (i) => ({ x: Math.min(i.x, i.x + i.w), y: Math.min(i.y, i.y + i.h), w: Math.abs(i.w), h: Math.abs(i.h) });
 function inside(i, f) { if (i === f || (i.type === 'frame' && i.w * i.h >= f.w * f.h)) return false; const cx = i.x + i.w / 2, cy = i.y + i.h / 2; return cx >= f.x && cx <= f.x + f.w && cy >= f.y && cy <= f.y + f.h; }
 // ---------- components + auto layout ----------
 const kidsOf = (f) => doc.items.filter((c) => c !== f && !c.hidden && inside(c, f));   // everything inside, nested frames' contents too
@@ -287,8 +291,8 @@ function zoomBy(f, cx, cy) { const r = svg.getBoundingClientRect(); cx = cx ?? r
 function fit() {
   const r = svg.getBoundingClientRect();
   if (!doc.items.length) { zoom = 0.5; panX = r.width / 2; panY = r.height / 2; render(); return; }
-  const x0 = Math.min(...doc.items.map((i) => i.x)), y0 = Math.min(...doc.items.map((i) => i.y)), x1 = Math.max(...doc.items.map((i) => i.x + i.w)), y1 = Math.max(...doc.items.map((i) => i.y + i.h));
-  zoom = clamp(Math.min((r.width - 80) / (x1 - x0), (r.height - 80) / (y1 - y0)), 0.05, 2);
+  const B = doc.items.map(bb), x0 = Math.min(...B.map((b) => b.x)), y0 = Math.min(...B.map((b) => b.y)), x1 = Math.max(...B.map((b) => b.x + b.w)), y1 = Math.max(...B.map((b) => b.y + b.h));
+  zoom = clamp(Math.min((r.width - 80) / Math.max(1, x1 - x0), (r.height - 80) / Math.max(1, y1 - y0)), 0.05, 2);
   panX = (r.width - (x1 - x0) * zoom) / 2 - x0 * zoom; panY = (r.height - (y1 - y0) * zoom) / 2 - y0 * zoom; render();
 }
 
@@ -364,8 +368,8 @@ function render() {
   gItems.textContent = ''; gUI.textContent = '';
   for (const i of doc.items) gItems.append(itemEl(i));
   for (const id of sel) {
-    const i = get(id); if (!i) continue;
-    const ol = sv('rect', { x: i.x, y: i.y, width: i.w, height: i.h, fill: 'none', stroke: '#e6e6e6', 'stroke-width': 1.2 / zoom, 'pointer-events': 'none' }); if (i.rot && i.type !== 'frame') ol.setAttribute('transform', `rotate(${i.rot} ${i.x + i.w / 2} ${i.y + i.h / 2})`); gUI.append(ol);
+    const i = get(id); if (!i) continue; const b = bb(i);
+    const ol = sv('rect', { x: b.x, y: b.y, width: b.w, height: b.h, fill: 'none', stroke: '#e6e6e6', 'stroke-width': 1.2 / zoom, 'pointer-events': 'none' }); if (i.rot && i.type !== 'frame') ol.setAttribute('transform', `rotate(${i.rot} ${i.x + i.w / 2} ${i.y + i.h / 2})`); gUI.append(ol);
   }
   if (mode === 'dev') {
     for (const i of doc.items) if (i.rd && !i.hidden) gUI.append(sv('circle', { cx: i.x + i.w, cy: i.y, r: 7 / zoom, fill: '#3ecf8e', stroke: '#0b2a1c', 'stroke-width': 1 / zoom, 'pointer-events': 'none' }));
@@ -571,7 +575,7 @@ function cssOf(i) {
   return L.join('\n');
 }
 async function copyText(t, what) { try { await navigator.clipboard.writeText(t); toast('Copied ' + what); } catch (e) { toast('Could not copy. Select the text and press Ctrl+C.'); } }
-function svgOfItem(i) { const g = itemEl(i, true), root = sv('svg', { xmlns: NS, width: i.w || 1, height: i.h || 1, viewBox: `${i.x} ${i.y} ${i.w || 1} ${i.h || 1}` }); root.append(g); return new XMLSerializer().serializeToString(root); }
+function svgOfItem(i) { const g = itemEl(i, true), b = bb(i), root = sv('svg', { xmlns: NS, width: b.w || 1, height: b.h || 1, viewBox: `${b.x} ${b.y} ${b.w || 1} ${b.h || 1}` }); root.append(g); return new XMLSerializer().serializeToString(root); }
 function devGuides(i) {
   const pf = parentFrame(i); if (!pf) return; const fs = 11 / zoom, col = '#f2555a';
   const L = (x1, y1, x2, y2, t) => { if (Math.abs(x2 - x1) + Math.abs(y2 - y1) < 1) return; gUI.append(sv('line', { x1, y1, x2, y2, stroke: col, 'stroke-width': 1 / zoom, 'pointer-events': 'none' })); const tx = sv('text', { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 3 / zoom, fill: col, 'font-size': fs, 'text-anchor': 'middle', 'pointer-events': 'none', 'font-family': 'Segoe UI,Arial,sans-serif' }); tx.textContent = Math.round(t); gUI.append(tx); };
@@ -606,8 +610,8 @@ function order(how) {
 }
 function align(a) {
   const it = [...sel].map(get).filter(Boolean); if (it.length < 2) return; commit();
-  const x0 = Math.min(...it.map((i) => i.x)), x1 = Math.max(...it.map((i) => i.x + i.w)), y0 = Math.min(...it.map((i) => i.y)), y1 = Math.max(...it.map((i) => i.y + i.h));
-  for (const i of it) { if (a === 'left') i.x = x0; else if (a === 'right') i.x = x1 - i.w; else if (a === 'center') i.x = (x0 + x1) / 2 - i.w / 2; else if (a === 'top') i.y = y0; else if (a === 'bottom') i.y = y1 - i.h; else if (a === 'middle') i.y = (y0 + y1) / 2 - i.h / 2; }
+  const B = it.map(bb), x0 = Math.min(...B.map((b) => b.x)), x1 = Math.max(...B.map((b) => b.x + b.w)), y0 = Math.min(...B.map((b) => b.y)), y1 = Math.max(...B.map((b) => b.y + b.h));
+  it.forEach((i, n) => { const b = B[n]; if (a === 'left') i.x += x0 - b.x; else if (a === 'right') i.x += x1 - b.w - b.x; else if (a === 'center') i.x += (x0 + x1) / 2 - b.w / 2 - b.x; else if (a === 'top') i.y += y0 - b.y; else if (a === 'bottom') i.y += y1 - b.h - b.y; else if (a === 'middle') i.y += (y0 + y1) / 2 - b.h / 2 - b.y; });
   render();
 }
 function del() {
@@ -652,6 +656,7 @@ function penFinish(close) {
 let drag = null, spaceDown = false, focusText = false, pen = null;
 svg.addEventListener('mousedown', (ev) => { if (ev.detail !== 2) return; const t = sel.size === 1 ? doc.items.find((x) => sel.has(x.id)) : null; if (t && t.type === 'text') { focusText = true; render(); } });
 svg.addEventListener('pointerdown', (ev) => {
+  if (ev.button === 2) return;
   svg.setPointerCapture(ev.pointerId);
   if (ev.button === 1 || spaceDown || tool === 'hand') { drag = { mode: 'pan', sx: ev.clientX, sy: ev.clientY, px: panX, py: panY }; return; }
   const p = toW(ev);
@@ -690,7 +695,7 @@ svg.addEventListener('pointermove', (ev) => {
     if (!ev.altKey) { // snap the moving group's edges/centres to other items' edges/centres
       const ms = new Set(drag.orig.map((o) => o.m)); const others = doc.items.filter((c) => !ms.has(c) && !c.hidden && c.type !== 'line');
       let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
-      for (const o of drag.orig) { bx0 = Math.min(bx0, o.x); by0 = Math.min(by0, o.y); bx1 = Math.max(bx1, o.x + o.m.w); by1 = Math.max(by1, o.y + o.m.h); }
+      for (const o of drag.orig) { const b = bb({ x: o.x, y: o.y, w: o.m.w, h: o.m.h }); bx0 = Math.min(bx0, b.x); by0 = Math.min(by0, b.y); bx1 = Math.max(bx1, b.x + b.w); by1 = Math.max(by1, b.y + b.h); }
       const th = 5 / zoom; const best = (mine, targets) => { let b = null; for (const m of mine) for (const t of targets) { const d = t - m; if (Math.abs(d) <= th && (!b || Math.abs(d) < Math.abs(b.d))) b = { d, at: t }; } return b; };
       const xs = [], ys = []; for (const c of others) { xs.push(c.x, c.x + c.w / 2, c.x + c.w); ys.push(c.y, c.y + c.h / 2, c.y + c.h); }
       const sx = best([bx0 + dx, (bx0 + bx1) / 2 + dx, bx1 + dx], xs), sy = best([by0 + dy, (by0 + by1) / 2 + dy, by1 + dy], ys);
@@ -722,6 +727,15 @@ svg.addEventListener('pointermove', (ev) => {
   }
 });
 function renderLite() { renderItemsOnly(); render(); }
+// Escape (or a lost pointer) during a drag: put everything back as it was when the drag began
+function cancelDrag() {
+  if (!drag) return false; const d = drag; drag = null;
+  if (d.mode === 'marquee') d.r.remove();
+  else if (d.mode !== 'pan' && undoS.length) { doc = JSON.parse(undoS.pop()); sel = new Set([...sel].filter((id) => get(id))); if (d.mode === 'draw' || d.mode === 'pencil') setTool('select'); }
+  render(); return true;
+}
+svg.addEventListener('pointercancel', cancelDrag);
+window.addEventListener('blur', () => { spaceDown = false; });
 svg.addEventListener('pointerup', () => {
   if (!drag) return; const d = drag; drag = null;
   if ((d.mode === 'move' && d.moved) || d.mode === 'resize') autoKeyFor([...sel].map(get));
@@ -732,7 +746,7 @@ svg.addEventListener('pointerup', () => {
     else if ((d.tool !== 'line' && (i.w < 4 || i.h < 4)) || (d.tool === 'line' && Math.abs(i.w) + Math.abs(i.h) < 4)) { if (d.tool === 'line') { i.w = 120; i.h = 0; } else { i.w = d.tool === 'frame' ? 375 : 120; i.h = d.tool === 'frame' ? 667 : d.tool === 'polygon' || d.tool === 'star' ? 120 : 80; } }
     setTool('select'); render();
   } else if (d.mode === 'move' && !d.moved) { undoS.pop(); render(); }
-  else if (d.mode === 'marquee') { d.r.remove(); if (d.box && d.box.w > 3) for (const i of doc.items) if (!i.hidden && i.x < d.box.x + d.box.w && i.x + i.w > d.box.x && i.y < d.box.y + d.box.h && i.y + i.h > d.box.y && i.type !== 'frame') sel.add(i.id); render(); }
+  else if (d.mode === 'marquee') { d.r.remove(); if (d.box && d.box.w > 3) for (const i of doc.items) { const b = bb(i); if (!i.hidden && b.x < d.box.x + d.box.w && b.x + b.w > d.box.x && b.y < d.box.y + d.box.h && b.y + b.h > d.box.y && i.type !== 'frame') sel.add(i.id); } render(); }
   else render();
 });
 svg.addEventListener('wheel', (ev) => { ev.preventDefault(); const r = svg.getBoundingClientRect(); if (ev.ctrlKey || ev.metaKey) zoomBy(ev.deltaY < 0 ? 1.1 : 1 / 1.1, ev.clientX - r.left, ev.clientY - r.top); else { panX -= ev.deltaX; panY -= ev.deltaY; applyView(); } }, { passive: false });
@@ -758,7 +772,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.shiftKey && k === 'i') { pickImages(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') del();
   else if (e.key === 'Enter' && pen) { penFinish(false); }
-  else if (e.key === 'Escape') { if (fly) { closeFly(); return; } if (pen) { penFinish(false); return; } sel.clear(); setTool('select'); render(); }
+  else if (e.key === 'Escape') { if (fly) { closeFly(); return; } if (cancelDrag()) return; if (pen) { penFinish(false); return; } sel.clear(); setTool('select'); render(); }
   else if (e.key.startsWith('Arrow') && sel.size) { e.preventDefault(); const d = e.shiftKey ? 10 : 1; commit(); doc.items.filter((i) => sel.has(i.id)).forEach((i) => { if (e.key === 'ArrowLeft') i.x -= d; if (e.key === 'ArrowRight') i.x += d; if (e.key === 'ArrowUp') i.y -= d; if (e.key === 'ArrowDown') i.y += d; }); autoKeyFor(doc.items.filter((i) => sel.has(i.id))); render(); }
   else if (!e.ctrlKey && e.shiftKey && (k === 'l' || k === 'p')) setTool(k === 'l' ? 'arrow' : 'pencil');
   else if (!e.ctrlKey && mode !== 'dev' && 'vhfrolpt'.includes(k) && k.length === 1) { const t = { v: 'select', h: 'hand', f: 'frame', r: 'rect', o: 'ellipse', l: 'line', p: 'pen', t: 'text' }[k]; if (mode === 'design' || ['select', 'hand', 'rect', 'ellipse', 'line', 'pen'].includes(t)) setTool(t); }
@@ -805,7 +819,7 @@ async function saveDoc() {
   const bytes = new TextEncoder().encode(JSON.stringify(restDoc(), null, 1));
   if (fileBind) { try { const n = await window.host.folders.save(fileBind.key, fileBind.name, bytes, true); savedSnap = snapshot(); toast('Saved ' + n + ' in ' + fileBind.folder); renderStatus(); } catch (e) { fileBind = null; toast('Could not save to the folder. Choose another place.'); return saveDoc(); } return; }
   const r = await window.host.saveFile({ name: (doc.title || 'design') + '.frameout', filters: [['Frameout design', ['frameout']]], data: bytes }); if (r) { savedSnap = snapshot(); fileName = r.name; toast('Saved ' + r.name); renderStatus(); } }
-function exportTarget(forced) { const f = forced || (sel.size === 1 ? get([...sel][0]) : null); if (f && f.type === 'frame') return { f, only: doc.items.filter((i) => i === f || inside(i, f)) }; const all = doc.items.filter((i) => !i.hidden); if (!all.length) return null; const x0 = Math.min(...all.map((i) => i.x)), y0 = Math.min(...all.map((i) => i.y)), x1 = Math.max(...all.map((i) => i.x + i.w)), y1 = Math.max(...all.map((i) => i.y + i.h)); return { f: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, only: all }; }
+function exportTarget(forced) { const f = forced || (sel.size === 1 ? get([...sel][0]) : null); if (f && f.type === 'frame') return { f, only: doc.items.filter((i) => i === f || inside(i, f)) }; const all = doc.items.filter((i) => !i.hidden); if (!all.length) return null; const B = all.map(bb), x0 = Math.min(...B.map((b) => b.x)), y0 = Math.min(...B.map((b) => b.y)), x1 = Math.max(...B.map((b) => b.x + b.w)), y1 = Math.max(...B.map((b) => b.y + b.h)); return { f: { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) }, only: all }; }
 function exportSvgString(forced) {
   const t = exportTarget(forced); if (!t) return null; const { f, only } = t;
   const root = sv('svg', { xmlns: NS, width: f.w, height: f.h, viewBox: `${f.x} ${f.y} ${f.w} ${f.h}` });
