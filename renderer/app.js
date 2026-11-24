@@ -158,6 +158,8 @@ function tbtn(label, ic, fn, cls = '', tip = label) {
   const b = h('button', { class: 'btn ' + cls, onclick: fn, title: tip, 'aria-label': label });
   const i = icon(ic, 20); i.classList.add('ic'); i.dataset.for = label; b.append(i, document.createTextNode(label)); return b;
 }
+// a small button inside a clickable card: Enter/Space press the button, not the card; Esc and shortcuts still reach the page
+const stopPress = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); };
 const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', onfocus: () => { titleOld = doc.title || ''; }, onblur: () => { titleOld = null; }, oninput: (e) => { if (titleOld === null) titleOld = doc.title || ''; doc.title = e.target.value; syncTitle(); }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; syncTitle(); } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { doc.title = titleOld || doc.title; e.target.value = doc.title; syncTitle(); e.target.blur(); } } });
 let titleOld = null;   // the title before the current edit in the top bar, for Escape
 function syncTitle() { const r = document.querySelector('.rtitle'); if (r && r !== document.activeElement) r.value = doc.title; }
@@ -1061,8 +1063,8 @@ function recentGrid(list) {
     grid.append(h('div', { class: 'hcard', tabindex: 0, role: 'button', 'aria-label': 'Open ' + name, onclick: () => openRecent(e), onkeydown: (ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) openRecent(e); } },
       thumbBox(e.svg), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: 'Edited ' + ago(e.time) }),
       h('div', { class: 'hacts' },
-        h('button', { class: 'hib hstar' + (on ? ' on' : ''), title: on ? 'Remove star' : 'Star', 'aria-label': on ? 'Remove star' : 'Star', 'aria-pressed': on ? 'true' : 'false', onclick: (ev) => { ev.stopPropagation(); toggleStar(e.id); }, onkeydown: (ev) => ev.stopPropagation() }, icon(on ? 'starfill' : 'star', 20)),
-        h('button', { class: 'hib hrm', title: 'Remove from recent', 'aria-label': 'Remove from recent', onclick: (ev) => { ev.stopPropagation(); removeRecent(e.id); }, onkeydown: (ev) => ev.stopPropagation() }, icon('del', 20)))));
+        h('button', { class: 'hib hstar' + (on ? ' on' : ''), title: on ? 'Remove star' : 'Star', 'aria-label': on ? 'Remove star' : 'Star', 'aria-pressed': on ? 'true' : 'false', onclick: (ev) => { ev.stopPropagation(); toggleStar(e.id); }, onkeydown: stopPress }, icon(on ? 'starfill' : 'star', 20)),
+        h('button', { class: 'hib hrm', title: 'Remove from recent', 'aria-label': 'Remove from recent', onclick: (ev) => { ev.stopPropagation(); removeRecent(e.id); }, onkeydown: stopPress }, icon('del', 20)))));
   }
   return grid;
 }
@@ -1105,7 +1107,7 @@ function homeTemplates() {
   const grid = h('div', { class: 'home-grid' });
   for (const [name, sub, make] of TEMPLATES) grid.append(h('button', { class: 'hcard', onclick: () => startDesign(make()) }, thumbBox(docThumb(make())), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })));
   if (folderView.key !== 'templates') loadFolderFiles('templates');
-  const mine = h('div', { class: 'home-grid' }, folderView.key === 'templates' ? folderView.files.map((f) => fileCard(f, () => startDesign({ id: uid(), title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })), motion: f.doc.motion ? JSON.parse(JSON.stringify(f.doc.motion)) : undefined }), h('div', { class: 'hacts' }, h('button', { class: 'hib hrm', title: 'Remove template', 'aria-label': 'Remove template', onkeydown: (ev) => ev.stopPropagation(), onclick: async (ev) => { ev.stopPropagation(); if (confirm('Remove this template? Your original project file is not touched.')) { try { await window.host.folders.del('templates', f.name); } catch (e) { toast('Could not remove it'); } loadFolderFiles('templates'); } } }, icon('del', 20))))) : []);
+  const mine = h('div', { class: 'home-grid' }, folderView.key === 'templates' ? folderView.files.map((f) => fileCard(f, () => startDesign({ id: uid(), title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })), motion: f.doc.motion ? JSON.parse(JSON.stringify(f.doc.motion)) : undefined }), h('div', { class: 'hacts' }, h('button', { class: 'hib hrm', title: 'Remove template', 'aria-label': 'Remove template', onkeydown: stopPress, onclick: async (ev) => { ev.stopPropagation(); if (confirm('Remove this template? Your original project file is not touched.')) { try { await window.host.folders.del('templates', f.name); } catch (e) { toast('Could not remove it'); } loadFolderFiles('templates'); } } }, icon('del', 20))))) : []);
   return [h('div', { class: 'muted', style: 'margin:-6px 2px 12px', text: 'Start from a ready layout. Everything in it can be edited.' }), grid,
     h('div', { class: 'frow', style: 'margin-top:26px' }, h('h2', { style: 'margin:0', text: 'My templates' }), h('span', { class: 'grow' }), btn('Add your project', () => importInto('templates'), 'primary')),
     h('div', { class: 'muted', style: 'margin:6px 2px 12px', text: 'Upload a .frameout file and it becomes a template you can start new designs from. A copy is kept inside Frameout.' }),
