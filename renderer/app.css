@@ -92,7 +92,10 @@ input[type=text]:focus,input[type=number]:focus,input[type=search]:focus,input[t
 .fly.menu{z-index:70;min-width:200px}
 .fi{display:flex;align-items:center;gap:12px;width:100%;height:44px;padding:0 16px 0 12px;border:0;border-radius:0;background:transparent;color:var(--text);font:inherit;font-size:14px;text-align:left;cursor:pointer}
 .fi svg{color:var(--text-2);flex:none}
-.fi:hover,.fi:focus-visible{background:var(--hover);color:var(--text);outline:0}
+.fi:hover{background:var(--hover);color:var(--text)}
+.fi:focus-visible,.fly.kb .fi:focus{background:var(--press);color:var(--text);outline:2px solid var(--accent);outline-offset:-2px;border-radius:4px}
+.dk:focus-visible,.dkc:focus-visible,.zk:focus-visible,.pbtn:focus-visible,.hib:focus-visible,.htab:focus-visible,.hnew:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hib:focus-visible{opacity:1}
 .fi:active{background:var(--press)}
 .fly.menu .fi{padding:0 20px 0 16px}
 .fi .fck{width:16px;text-align:center;color:var(--accent)}

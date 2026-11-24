@@ -141,21 +141,21 @@ function tbtn(label, ic, fn, cls = '', tip = label) {
   const i = icon(ic, 20); i.classList.add('ic'); i.dataset.for = label; b.append(i, document.createTextNode(label)); return b;
 }
 const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', oninput: (e) => { doc.title = e.target.value; }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); } });
-const exportBtn = tbtn('Export', 'download', (e) => openMenu(e.currentTarget, 'export', [['image', 'Export PNG', () => exportImg('png')], ['code', 'Export SVG', () => exportImg('svg')]]));
+const exportBtn = tbtn('Export', 'download', (e) => openMenu(e.currentTarget, 'export', [['image', 'Export PNG', () => exportImg('png')], ['code', 'Export SVG', () => exportImg('svg')]], e.detail === 0));
 exportBtn.dataset.menu = 'export'; exportBtn.setAttribute('aria-haspopup', 'menu');
 toolbar.append(tbtn('Home', 'home', () => showHome('home'), '', 'Home (all designs)'), titleInput, h('span', { class: 'grow' }),
   tbtn('New', 'newdoc', newDoc, '', 'New design'), tbtn('Open', 'open', openDoc, '', 'Open a file (Ctrl+O)'), exportBtn,
   tbtn('Keyboard shortcuts', 'keyboard', () => showHelp()),
   tbtn('Preview', 'eye', startPreview, 'primary tonal', 'Preview the design'), tbtn('Save', 'save', saveDoc, 'primary', 'Save (Ctrl+S)'));
 // a small menu anchored under (or above) a button; shares the "fly" slot so Esc / outside click close it
-function openMenu(anchor, id, items) {
+function openMenu(anchor, id, items, kb) {
   const was = fly && fly.dataset.g === 'menu:' + id; closeFly(); if (was) return;
   fly = h('div', { class: 'fly menu', role: 'menu', 'data-g': 'menu:' + id });
   for (const [ic, label, fn] of items) fly.append(h('button', { class: 'fi', role: 'menuitem', onclick: () => { closeFly(); fn(); } }, icon(ic, 20), h('span', { class: 'fl', text: label })));
   document.body.append(fly);
   const r = anchor.getBoundingClientRect(), w = fly.offsetWidth;
   fly.style.position = 'fixed'; fly.style.top = (r.bottom + 6) + 'px'; fly.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px';
-  fly.querySelector('.fi').focus();
+  flyAnchor = anchor; if (kb) fly.classList.add('kb'); fly.querySelector('.fi').focus();
 }
 // ---------- images ----------
 // shrinks the picture so a design stays small (it is stored inside the .frameout file), then makes an image layer
@@ -229,7 +229,8 @@ const GROUPS = {
 const grpCur = { move: 'select', frame: 'frame', shape: 'rect', pen: 'pen', text: 'text' };
 const grpEls = {};
 let fly = null;
-function closeFly() { if (fly) { fly.remove(); fly = null; } }
+let flyAnchor = null;
+function closeFly(refocus) { if (fly) { fly.remove(); fly = null; } const a = flyAnchor; flyAnchor = null; if (refocus && a && a.isConnected) a.focus(); }
 function toolLabel(k) { for (const g in GROUPS) for (const t of GROUPS[g]) if (t[0] === k) return t; return [k, k, '']; }
 function pickTool(k) { closeFly(); if (k === 'image') pickImages(); else setTool(k); }
 function openFly(g, anchor) {
@@ -238,7 +239,7 @@ function openFly(g, anchor) {
   for (const [k, label, key] of (grpEls[g] ? grpEls[g].list : GROUPS[g])) fly.append(h('button', { class: 'fi', role: 'menuitem', title: label, onclick: () => pickTool(k) }, h('span', { class: 'fck', text: k === grpCur[g] ? '✓' : '' }), dockIcon(k), h('span', { class: 'fl', text: label }), h('span', { class: 'fk', text: key })));
   const r = anchor.getBoundingClientRect(), sr = stage.getBoundingClientRect();
   fly.style.left = Math.max(8, r.left - sr.left - 6) + 'px'; fly.style.bottom = (sr.bottom - r.top + 8) + 'px';
-  stage.append(fly);
+  stage.append(fly); flyAnchor = anchor.querySelector('.dkc') || anchor;
 }
 document.addEventListener('pointerdown', (e) => { if (fly && !fly.contains(e.target) && !e.target.closest('.dkc,[data-menu]')) closeFly(); }, true);
 function toolGroup(g, skip) {
@@ -738,6 +739,10 @@ svg.addEventListener('wheel', (ev) => { ev.preventDefault(); const r = svg.getBo
 document.addEventListener('keydown', (e) => {
   if (homeOpen) { if (e.key === 'Escape' && session && !document.querySelector('.modal-back')) closeHome(); return; }
   if (preview) { if (e.key === 'Escape') endPreview(); else if (e.key === 'Backspace' || e.key === 'ArrowLeft') previewBack(); return; }
+  if (fly && !document.querySelector('.modal-back')) { // open menu: Esc closes it and gives focus back, arrows move between items
+    if (e.key === 'Escape') { e.preventDefault(); closeFly(true); return; }
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && fly.contains(e.target)) { e.preventDefault(); fly.classList.add('kb'); const it = [...fly.querySelectorAll('.fi')], i = it.indexOf(e.target); it[(i + (e.key === 'ArrowDown' ? 1 : it.length - 1)) % it.length].focus(); return; }
+  }
   if (e.target.matches('input,textarea,select')) return;
   if (document.querySelector('.modal-back') || (!e.ctrlKey && !e.metaKey && e.target.matches('button,[contenteditable]'))) return;
   const k = e.key.toLowerCase();
@@ -956,7 +961,7 @@ function homeTemplates() {
   const grid = h('div', { class: 'home-grid' });
   for (const [name, sub, make] of TEMPLATES) grid.append(h('button', { class: 'hcard', onclick: () => startDesign(make()) }, thumbBox(docThumb(make())), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })));
   if (folderView.key !== 'templates') loadFolderFiles('templates');
-  const mine = h('div', { class: 'home-grid' }, folderView.key === 'templates' ? folderView.files.map((f) => fileCard(f, () => startDesign({ id: uid(), title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })) }), h('button', { class: 'btn hrm', title: 'Remove this template', onclick: async (ev) => { ev.stopPropagation(); if (confirm('Remove this template? Your original project file is not touched.')) { try { await window.host.folders.del('templates', f.name); } catch (e) { toast('Could not remove it'); } loadFolderFiles('templates'); } }, text: 'Remove' }))) : []);
+  const mine = h('div', { class: 'home-grid' }, folderView.key === 'templates' ? folderView.files.map((f) => fileCard(f, () => startDesign({ id: uid(), title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })) }), h('div', { class: 'hacts' }, h('button', { class: 'hib hrm', title: 'Remove template', 'aria-label': 'Remove template', onkeydown: (ev) => ev.stopPropagation(), onclick: async (ev) => { ev.stopPropagation(); if (confirm('Remove this template? Your original project file is not touched.')) { try { await window.host.folders.del('templates', f.name); } catch (e) { toast('Could not remove it'); } loadFolderFiles('templates'); } } }, icon('del', 20))))) : []);
   return [h('div', { class: 'muted', style: 'margin:-6px 2px 12px', text: 'Start from a ready layout. Everything in it can be edited.' }), grid,
     h('div', { class: 'frow', style: 'margin-top:26px' }, h('h2', { style: 'margin:0', text: 'My templates' }), h('span', { class: 'grow' }), btn('Add your project', () => importInto('templates'), 'primary')),
     h('div', { class: 'muted', style: 'margin:6px 2px 12px', text: 'Upload a .frameout file and it becomes a template you can start new designs from. A copy is kept inside Frameout.' }),
