@@ -106,6 +106,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## What is new
 
+**1.0.31:** New Google-style look: rounded panels, a Gemini-style home menu with Home, Recent, Starred, Templates, Settings and Help, new icons and dialogs. About 45 bug fixes (drag cancel, undo and redo, locked layers, big PNG export, empty text, shortcuts while typing, motion keys). Frameout asks before closing a design with unsaved changes.
+
 **1.0.30:** Folders are hidden from the home screen.
 
 **1.0.29:** Folders are categories. The + beside Folders asks for a name and Frameout makes the folder itself; no folder picker. Home shows folder cards. Folder page is simpler. Templates page has no New design button.
