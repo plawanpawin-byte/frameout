@@ -12,18 +12,36 @@ const h = (tag, props = {}, ...kids) => {
 };
 const NS = 'http://www.w3.org/2000/svg';
 const sv = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+// Material Symbols (Outlined) style icons, fill-based, on a 24px grid. Path data in the style of Google's Material icons (Apache-2.0).
 const ICONS = {
-  home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
-  templates: '<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="11" width="8" height="10" rx="2"/><rect x="3" y="14" width="8" height="7" rx="2"/>',
-  settings: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
-  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
-  back: '<path d="M10 6l-6 6 6 6M4 12h16"/>',
-  plus: '<path d="M12 5v14M5 12h14"/>',
-  folderplus: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/>',
-  open: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
-  example: '<rect x="3" y="4" width="7" height="14" rx="2"/><rect x="14" y="6" width="7" height="14" rx="2"/><path d="M10 11h4"/>',
+  home: 'M12 5.69l5 4.5V18h-2v-6H9v6H7v-7.81l5-4.5M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z',
+  recent: 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z',
+  star: 'M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z',
+  starfill: 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
+  templates: 'M3 3v8h8V3H3zm6 6H5V5h4v4zm-6 4v8h8v-8H3zm6 6H5v-4h4v4zm4-16v8h8V3h-8zm6 6h-4V5h4v4zm-6 4v8h8v-8h-8zm6 6h-4v-4h4v4z',
+  settings: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
+  help: 'M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z',
+  keyboard: 'M20 7v10H4V7h16m0-2H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2zm0 3h2v2h-2zM8 8h2v2H8zm0 3h2v2H8zm-3 0h2v2H5zm0-3h2v2H5zm3 6h8v2H8zm6-3h2v2h-2zm0-3h2v2h-2zm3 3h2v2h-2zm0-3h2v2h-2z',
+  menu: 'M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z',
+  back: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
+  plus: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+  close: 'M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
+  folderplus: 'M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm0 12H4V6h5.17l2 2H20v10zm-8-4h2v2h2v-2h2v-2h-2v-2h-2v2h-2z',
+  open: 'M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z',
+  newdoc: 'M13 11h-2v3H8v2h3v3h2v-3h3v-2h-3zm1-9H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z',
+  example: 'M15.5 1h-8C6.12 1 5 2.12 5 3.5v17C5 21.88 6.12 23 7.5 23h8c1.38 0 2.5-1.12 2.5-2.5v-17C18 2.12 16.88 1 15.5 1zm-4 21c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4.5-4H7V4h9v14z',
+  save: 'M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zM6 6h9v4H6z',
+  eye: 'M12 6c3.79 0 7.17 2.13 8.82 5.5C19.17 14.87 15.79 17 12 17s-7.17-2.13-8.82-5.5C4.83 8.13 8.21 6 12 6m0-2C7 4 2.73 7.11 1 11.5 2.73 15.89 7 19 12 19s9.27-3.11 11-7.5C21.27 7.11 17 4 12 4zm0 5c1.38 0 2.5 1.12 2.5 2.5S13.38 14 12 14s-2.5-1.12-2.5-2.5S10.62 9 12 9m0-2c-2.48 0-4.5 2.02-4.5 4.5S9.52 16 12 16s4.5-2.02 4.5-4.5S14.48 7 12 7z',
+  download: 'M18 15v3H6v-3H4v3c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-3h-2zm-1-4l-1.41-1.41L13 12.17V4h-2v8.17L8.41 9.59 7 11l5 5 5-5z',
+  image: 'M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.86 8.86l-3 3.87L9 13.14 6 17h12l-3.86-5.14z',
+  code: 'M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z',
+  del: 'M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z',
+  panl: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 19H5V5h4v14zm10 0h-8V5h8v14z',
+  panr: 'M5 3h14c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2zm10 16h4V5h-4v14zM5 19h8V5H5v14z',
 };
-const icon = (name, size = 18) => { const s = sv('svg', { viewBox: '0 0 24 24', width: size, height: size, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.7, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' }); const d = new DOMParser().parseFromString('<svg xmlns="' + NS + '">' + ICONS[name] + '</svg>', 'image/svg+xml').documentElement; for (const n of [...d.childNodes]) s.append(document.importNode(n, true)); return s; };
+// one fill-based 24px icon; `d` is path data, evenodd keeps cut-outs open for the hand-drawn tool glyphs
+const fillIcon = (d, size = 20) => { const s = sv('svg', { viewBox: '0 0 24 24', width: size, height: size, fill: 'currentColor', 'aria-hidden': 'true', class: 'ms' }); s.append(sv('path', { d, 'fill-rule': 'evenodd' })); return s; };
+const icon = (name, size = 20) => fillIcon(ICONS[name] || ICONS.plus, size);
 const uid = () => Math.random().toString(36).slice(2, 8);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const toast = (m) => { const t = h('div', { class: 'toast', text: m }); document.body.append(t); setTimeout(() => t.remove(), 2400); };
@@ -117,10 +135,28 @@ const right = h('div', { class: 'sidebar right', style: 'width:270px' });
 const status = h('div', { class: 'status' });
 app.append(toolbar, h('div', { class: 'main', style: 'flex:1;min-height:0;min-width:0;width:100%;overflow:hidden' }, left, stage, right), status);
 const btn = (label, fn, cls = '') => h('button', { class: 'btn ' + cls, onclick: fn, text: label });
+// top-bar button: our own fill icon (data-for tells kit.js not to add its line icon) + a label that kit.js hides unless "Aa" is on
+function tbtn(label, ic, fn, cls = '', tip = label) {
+  const b = h('button', { class: 'btn ' + cls, onclick: fn, title: tip, 'aria-label': label });
+  const i = icon(ic, 20); i.classList.add('ic'); i.dataset.for = label; b.append(i, document.createTextNode(label)); return b;
+}
 const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', oninput: (e) => { doc.title = e.target.value; }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); } });
-toolbar.append(btn('Home', () => showHome('home')), btn('New', newDoc), btn('Open', openDoc), btn('Save', saveDoc, 'primary'));
-toolbar.append(h('span', { class: 'grow' }), titleInput,
-  btn('Preview', startPreview), btn('Export PNG', () => exportImg('png')), btn('Export SVG', () => exportImg('svg')));
+const exportBtn = tbtn('Export', 'download', (e) => openMenu(e.currentTarget, 'export', [['image', 'Export PNG', () => exportImg('png')], ['code', 'Export SVG', () => exportImg('svg')]]));
+exportBtn.dataset.menu = 'export'; exportBtn.setAttribute('aria-haspopup', 'menu');
+toolbar.append(tbtn('Home', 'home', () => showHome('home'), '', 'Home (all designs)'), titleInput, h('span', { class: 'grow' }),
+  tbtn('New', 'newdoc', newDoc, '', 'New design'), tbtn('Open', 'open', openDoc, '', 'Open a file (Ctrl+O)'), exportBtn,
+  tbtn('Keyboard shortcuts', 'keyboard', () => showHelp()),
+  tbtn('Preview', 'eye', startPreview, 'primary tonal', 'Preview the design'), tbtn('Save', 'save', saveDoc, 'primary', 'Save (Ctrl+S)'));
+// a small menu anchored under (or above) a button; shares the "fly" slot so Esc / outside click close it
+function openMenu(anchor, id, items) {
+  const was = fly && fly.dataset.g === 'menu:' + id; closeFly(); if (was) return;
+  fly = h('div', { class: 'fly menu', role: 'menu', 'data-g': 'menu:' + id });
+  for (const [ic, label, fn] of items) fly.append(h('button', { class: 'fi', role: 'menuitem', onclick: () => { closeFly(); fn(); } }, icon(ic, 20), h('span', { class: 'fl', text: label })));
+  document.body.append(fly);
+  const r = anchor.getBoundingClientRect(), w = fly.offsetWidth;
+  fly.style.position = 'fixed'; fly.style.top = (r.bottom + 6) + 'px'; fly.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px';
+  fly.querySelector('.fi').focus();
+}
 // ---------- images ----------
 // shrinks the picture so a design stays small (it is stored inside the .frameout file), then makes an image layer
 async function imageItemFromBytes(bytes, name) {
@@ -148,38 +184,39 @@ async function addImages(files) {
 }
 async function pickImages() { const fs = await window.host.openFiles({ multi: true, maxBytes: 25 * 1024 * 1024, filters: [['Pictures', ['png', 'jpg', 'jpeg', 'webp', 'gif']]] }); if (fs && fs.length) addImages(fs.filter((f) => f.data)); }
 // floating tool dock at the bottom of the canvas, like Figma: tools with a small arrow open a menu of related tools
+// fill-based, Material Symbols Outlined style (same grid and weight as ICONS)
 const DOCK_ICONS = {
-  select: '<path d="M5 3l14 7-6 2-2 6z"/>',
-  hand: '<path d="M8 13V6a1.5 1.5 0 0 1 3 0v5M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2-4a1.5 1.5 0 0 1 2.4-1.7L8 14"/>',
-  frame: '<path d="M7 3v18M17 3v18M3 7h18M3 17h18"/>',
-  rect: '<rect x="4" y="5" width="16" height="14" rx="2"/>',
-  ellipse: '<circle cx="12" cy="12" r="8"/>',
-  line: '<path d="M5 19L19 5"/>',
-  arrow: '<path d="M5 19L19 5M9 5h10v10"/>',
-  polygon: '<path d="M12 4l9 16H3z"/>',
-  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
-  pen: '<path d="M12 21l-6-8 3-9h6l3 9z"/><circle cx="12" cy="11" r="1.5"/><path d="M12 12.5V21"/>',
-  pencil: '<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/>',
-  text: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
-  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/>',
-  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
-  redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
-  dupe: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
-  del: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
-  comp: '<path d="M12 3l4 4-4 4-4-4zM12 13l4 4-4 4-4-4zM3 8l4 4-4 4M21 8l-4 4 4 4"/>',
-  zout: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5M8 11h6"/>',
-  zin: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5M8 11h6M11 8v6"/>',
-  fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
-  play: '<path d="M7 4l13 8-13 8z"/>',
-  pause: '<path d="M8 5v14M16 5v14"/>',
-  keyf: '<path d="M12 4l7 8-7 8-7-8z"/>',
-  caret: '<path d="M7 10l5 5 5-5"/>',
-  m_draw: '<path d="M4 18c3-9 5 3 8-4s5-6 8-8"/>',
-  m_design: '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4z"/><path d="M16.5 13v7M13 16.5h7"/>',
-  m_motion: '<path d="M3 6h18M3 12h11M3 18h6"/><circle cx="19" cy="12" r="2"/>',
-  m_dev: '<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',
+  select: 'M6 3.5v15.2l4-3.9 2.6 5.9 2.7-1.2-2.6-5.8h5.6z',
+  hand: 'M23 5.5V20c0 2.2-1.8 4-4 4h-7.3c-1.08 0-2.1-.43-2.85-1.19L1 14.83s1.26-1.23 1.3-1.25c.22-.19.49-.29.79-.29.22 0 .42.06.6.16.04.01 4.31 2.46 4.31 2.46V4c0-.83.67-1.5 1.5-1.5S11 3.17 11 4v7h1V1.5c0-.83.67-1.5 1.5-1.5S15 .67 15 1.5V11h1V2.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5V11h1V5.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5z',
+  frame: 'M20 10V8h-4V4h-2v4h-4V4H8v4H4v2h4v4H4v2h4v4h2v-4h4v4h2v-4h4v-2h-4v-4h4zm-6 4h-4v-4h4v4z',
+  rect: 'M18 4H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H6V6h12v12z',
+  ellipse: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z',
+  line: 'M4.4 18.2L18.2 4.4l1.4 1.4L5.8 19.6z',
+  arrow: 'M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5z',
+  polygon: 'M12 7.77L18.39 18H5.61L12 7.77M12 4L2 20h20L12 4z',
+  star: ICONS.star,
+  pen: 'M12 2L5.5 9.3 8.6 18h6.8l3.1-8.7zM11.25 4.8h1.5v5.5h-1.5zM12 10.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 0 1 0-2.8zM8.5 19.5h7V22h-7z',
+  pencil: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM5.92 19H5v-.92l9.06-9.06.92.92L5.92 19zM20.71 5.63l-2.34-2.34c-.2-.2-.45-.29-.71-.29s-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83c.39-.39.39-1.02 0-1.41z',
+  text: 'M5 4v3h5.5v12h3V7H19V4z',
+  image: ICONS.image,
+  undo: 'M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z',
+  redo: 'M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z',
+  dupe: 'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z',
+  del: ICONS.del,
+  comp: 'M16.66 4.52l2.83 2.83-2.83 2.83-2.83-2.83 2.83-2.83M9 5v4H5V5h4m10 10v4h-4v-4h4M9 15v4H5v-4h4m7.66-13.31L11 7.34 16.66 13l5.66-5.66-5.66-5.65zM11 3H3v8h8V3zm10 10h-8v8h8v-8zm-10 0H3v8h8v-8z',
+  zout: 'M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM7 9h5v1H7z',
+  zin: 'M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM12 10h-2v2H9v-2H7V9h2V7h1v2h2v1z',
+  fit: 'M17 4h3c1.1 0 2 .9 2 2v2h-2V6h-3V4zM4 8V6h3V4H4c-1.1 0-2 .9-2 2v2h2zm16 8v2h-3v2h3c1.1 0 2-.9 2-2v-2h-2zM7 18H4v-2H2v2c0 1.1.9 2 2 2h3v-2zM16 8H8c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h8c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 6H9v-4h6v4z',
+  play: 'M10 8.64L15.27 12 10 15.36V8.64M8 5v14l11-7L8 5z',
+  pause: 'M6 19h4V5H6v14zm8-14v14h4V5h-4z',
+  keyf: 'M12 2.5L21.5 12 12 21.5 2.5 12z',
+  caret: 'M7 10l5 5 5-5z',
+  m_draw: 'M7 16c.55 0 1 .45 1 1 0 1.1-.9 2-2 2-.17 0-.33-.02-.5-.05.31-.55.5-1.21.5-1.95 0-.55.45-1 1-1M18.67 3c-.26 0-.51.1-.71.29L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.02 0-1.41l-1.34-1.34c-.2-.2-.45-.29-.7-.29zM7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z',
+  m_design: 'M19 5v2h-4V5h4M9 5v6H5V5h4m10 8v6h-4v-6h4M9 17v2H5v-2h4M21 3h-8v6h8V3zM11 3H3v10h8V3zm10 8h-8v10h8V11zm-10 4H3v6h8v-6z',
+  m_motion: 'M15 2c-2.71 0-5.05 1.54-6.22 3.78-1.28.67-2.34 1.72-3 3C3.54 9.95 2 12.29 2 15c0 3.87 3.13 7 7 7 2.71 0 5.05-1.54 6.22-3.78 1.28-.67 2.34-1.72 3-3C20.46 14.05 22 11.71 22 9c0-3.87-3.13-7-7-7zM9 20c-2.76 0-5-2.24-5-5 0-1.12.37-2.16 1-3 0 3.87 3.13 7 7 7-.84.63-1.88 1-3 1zm3-3c-2.76 0-5-2.24-5-5 0-1.12.37-2.16 1-3 0 3.86 3.13 6.99 7 7-.84.63-1.88 1-3 1zm4.7-3.3c-.53.19-1.1.3-1.7.3-2.76 0-5-2.24-5-5 0-.6.11-1.17.3-1.7.53-.19 1.1-.3 1.7-.3 2.76 0 5 2.24 5 5 0 .6-.11 1.17-.3 1.7zM19 12c0-3.86-3.13-6.99-7-7 .84-.63 1.87-1 3-1 2.76 0 5 2.24 5 5 0 1.12-.37 2.16-1 3z',
+  m_dev: ICONS.code,
 };
-const dockIcon = (k, size = 18) => { const ico = sv('svg', { viewBox: '0 0 24 24', width: size, height: size, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' }); for (const n of [...new DOMParser().parseFromString('<svg xmlns="' + NS + '">' + DOCK_ICONS[k] + '</svg>', 'image/svg+xml').documentElement.childNodes]) ico.append(document.importNode(n, true)); return ico; };
+const dockIcon = (k, size = 20) => fillIcon(DOCK_ICONS[k] || ICONS.plus, size);
 const dock = h('div', { class: 'dock', role: 'toolbar', 'aria-label': 'Tools' });
 // tool groups: the first tool shows on the button, the others are in the menu next to it
 const GROUPS = {
@@ -203,7 +240,7 @@ function openFly(g, anchor) {
   fly.style.left = Math.max(8, r.left - sr.left - 6) + 'px'; fly.style.bottom = (sr.bottom - r.top + 8) + 'px';
   stage.append(fly);
 }
-document.addEventListener('pointerdown', (e) => { if (fly && !fly.contains(e.target) && !e.target.closest('.dkc')) closeFly(); }, true);
+document.addEventListener('pointerdown', (e) => { if (fly && !fly.contains(e.target) && !e.target.closest('.dkc,[data-menu]')) closeFly(); }, true);
 function toolGroup(g, skip) {
   const list = GROUPS[g].filter((t) => !(skip || []).includes(t[0])), box = h('div', { class: 'dgt' });
   const main = h('button', { class: 'dk', onclick: () => setTool(grpCur[g]) });
@@ -218,12 +255,12 @@ function buildDock() {
   closeFly(); dock.textContent = ''; for (const g in grpEls) delete grpEls[g];
   const compFn = () => { const i = doc.items.find((x) => sel.has(x.id)); if (sel.size === 1 && i) makeComponent(i); else toast('Select one layer first'); };
   const edit = actGroup([['undo', 'Undo', 'Ctrl+Z', () => undo()], ['redo', 'Redo', 'Ctrl+Y', () => redo()], ['dupe', 'Duplicate', 'Ctrl+D', () => dupe()], ['del', 'Delete', 'Del', () => del()]]);
-  const zoomG = actGroup([['zout', 'Zoom out', '', () => zoomBy(1 / 1.2)], ['zin', 'Zoom in', '', () => zoomBy(1.2)], ['fit', 'Fit to screen', '', () => fit()]]);
+  // zoom lives in the floating .zoomctl pill (top right of the canvas), so the dock only holds tools and edits
   const wrap = (...els) => { const d = h('div', { class: 'dg' }); els.forEach((e) => d.append(e)); return d; };
-  if (mode === 'design') dock.append(wrap(toolGroup('move'), toolGroup('frame'), toolGroup('shape'), toolGroup('pen'), toolGroup('text')), edit, actGroup([['comp', 'Create component', '', compFn], ['zout', 'Zoom out', '', () => zoomBy(1 / 1.2)], ['zin', 'Zoom in', '', () => zoomBy(1.2)], ['fit', 'Fit to screen', '', () => fit()]]), actGroup([['play', 'Preview', '', () => startPreview()]]));
-  else if (mode === 'draw') dock.append(wrap(toolGroup('move'), toolGroup('pen'), toolGroup('shape', ['image'])), edit, zoomG);
-  else if (mode === 'motion') dock.append(wrap(toolGroup('move')), actGroup([['undo', 'Undo', 'Ctrl+Z', () => undo()], ['redo', 'Redo', 'Ctrl+Y', () => redo()]]), zoomG);
-  else dock.append(wrap(toolGroup('move')), zoomG);
+  if (mode === 'design') dock.append(wrap(toolGroup('move'), toolGroup('frame'), toolGroup('shape'), toolGroup('pen'), toolGroup('text')), edit, actGroup([['comp', 'Create component', '', compFn], ['play', 'Preview', '', () => startPreview()]]));
+  else if (mode === 'draw') dock.append(wrap(toolGroup('move'), toolGroup('pen'), toolGroup('shape', ['image'])), edit);
+  else if (mode === 'motion') dock.append(wrap(toolGroup('move')), actGroup([['undo', 'Undo', 'Ctrl+Z', () => undo()], ['redo', 'Redo', 'Ctrl+Y', () => redo()]]));
+  else dock.append(wrap(toolGroup('move')));
   const md = h('div', { class: 'dg modes', role: 'group', 'aria-label': 'Mode' }); for (const [m, label, ic] of MODES) md.append(h('button', { class: 'dk' + (m === mode ? ' on' : ''), title: label, 'aria-label': label, 'aria-pressed': m === mode ? 'true' : 'false', 'data-mode': m, onclick: () => setMode(m) }, dockIcon(ic)));
   dock.append(md); refreshDock();
 }
@@ -231,13 +268,16 @@ function refreshDock() {
   for (const g in grpEls) { const { main, list } = grpEls[g]; const k = grpCur[g], [, label, key] = toolLabel(k); main.textContent = ''; main.append(dockIcon(k)); main.title = label + (key ? ' (' + key + ')' : ''); main.setAttribute('aria-label', label); main.classList.toggle('on', tool === k && list.some((t) => t[0] === k)); }
 }
 stage.append(dock);
+const zoomPct = h('button', { class: 'zk zpct', title: 'Zoom to 100%', 'aria-label': 'Zoom to 100%', onclick: () => zoomBy(1 / zoom), text: '100%' });
+const zk = (ic, label, fn) => h('button', { class: 'zk', title: label, 'aria-label': label, onclick: fn }, dockIcon(ic, 20));
+stage.append(h('div', { class: 'zoomctl', role: 'group', 'aria-label': 'Zoom' }, zk('zout', 'Zoom out', () => zoomBy(1 / 1.2)), zoomPct, zk('zin', 'Zoom in', () => zoomBy(1.2)), zk('fit', 'Fit to screen', () => fit())));
 function setTool(t) {
   if (pen && t !== 'pen') penFinish(false);
   tool = t; for (const g in GROUPS) if (GROUPS[g].some((x) => x[0] === t)) grpCur[g] = t;
   refreshDock(); svg.style.cursor = t === 'select' ? 'default' : t === 'hand' ? 'grab' : 'crosshair';
 }
 
-const svg = sv('svg', { width: '100%', height: '100%', style: 'display:block;touch-action:none;background:#1c1c1c' });
+const svg = sv('svg', { width: '100%', height: '100%', style: 'display:block;touch-action:none;background:var(--canvas)' });
 const world = sv('g'); const gItems = sv('g'), gUI = sv('g');
 world.append(gItems, gUI); svg.append(world); stage.append(svg);
 const toW = (e) => { const r = svg.getBoundingClientRect(); return { x: (e.clientX - r.left - panX) / zoom, y: (e.clientY - r.top - panY) / zoom }; };
@@ -340,10 +380,16 @@ function render() {
   }
   applyView(); renderLeft(); renderRight(); if (!noTl) renderTimeline();
 }
-function renderStatus() { status.textContent = ''; status.append(h('span', { text: fileName || 'Untitled' }), h('span', { class: 'grow' }), h('span', { text: doc.items.length + ' layers' }), h('span', { text: Math.round(zoom * 100) + '%' })); }
+function renderStatus() { status.textContent = ''; status.append(h('span', { text: fileName || 'Not saved to a file yet' }), h('span', { class: 'grow' }), h('span', { text: doc.items.length + ' layers' })); zoomPct.textContent = Math.round(zoom * 100) + '%'; }
+// NotebookLM-style panel header: title + a round button that folds the panel away (kit.js grip brings it back)
+function phead(title, side) {
+  const hide = 'Hide ' + title.toLowerCase() + ' panel';
+  return h('div', { class: 'phead' }, h('h2', { class: 'ptitle', text: title }),
+    h('button', { class: 'pbtn', title: hide, 'aria-label': hide, onclick: () => { if (window.lkPanel) window.lkPanel(side); } }, icon(side === 'left' ? 'panl' : 'panr', 20)));
+}
 function renderLeft() {
   left.textContent = '';
-  left.append(h('h3', { text: 'Layers' }));
+  left.append(phead('Layers', 'left'));
   const list = h('div', { class: 'list' });
   [...doc.items].reverse().forEach((i) => {
     const row = h('div', { class: 'item' + (sel.has(i.id) ? ' sel' : ''), style: 'display:flex;gap:4px;align-items:center;cursor:pointer;padding:3px 6px', onclick: (e) => { if (e.shiftKey) { sel.has(i.id) ? sel.delete(i.id) : sel.add(i.id); } else sel = new Set([i.id]); render(); } },
@@ -361,8 +407,8 @@ function renderLeft() {
 }
 function renderRight() {
   right.textContent = '';
-  if (mode === 'dev') { right.append(h('h3', { text: 'Design' })); renderDev(); return; }
-  right.append(h('h3', { text: 'Design' }), h('label', { class: 'field' }, 'Title', h('input', { type: 'text', value: doc.title, oninput: (e) => { doc.title = e.target.value; } })));
+  if (mode === 'dev') { right.append(phead('Code', 'right')); renderDev(); return; }
+  right.append(phead(mode === 'motion' ? 'Motion' : 'Design', 'right'), h('label', { class: 'field' }, 'Title', h('input', { type: 'text', value: doc.title, oninput: (e) => { doc.title = e.target.value; } })));
   const items = [...sel].map(get).filter(Boolean); if (!items.length) { right.append(h('h3', { text: 'Tips' }), h('div', { class: 'muted', style: 'font-size:12px;line-height:1.6;white-space:pre-line', text: 'Pick a tool or press its letter, then drag on the canvas.\nShift-click to select several.\nScroll to pan, Ctrl+scroll to zoom, hold Space to pan.\nGive a shape a Link to a frame, then press Preview to click through your prototype.' })); return; }
   const i = items[0];
   let nameUndo = false;
@@ -718,7 +764,7 @@ document.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = 
 function startPreview() {
   const frames = doc.items.filter((f) => f.type === 'frame' && !f.hidden); if (!frames.length) { toast('Add a frame first'); return; }
   const start = (sel.size && get([...sel][0])?.type === 'frame' ? get([...sel][0]) : frames[0]);
-  const back = h('div', { class: 'modal-back', style: 'background:#141414;flex-direction:column;gap:10px' });
+  const back = h('div', { class: 'modal-back pv', style: 'flex-direction:column;gap:16px' });
   preview = { back, frame: start, hist: [], hot: false };
   document.body.append(back); showPreviewFrame(start, 'none', true);
 }
@@ -737,7 +783,7 @@ function showPreviewFrame(f, how = 'none', noPush = false) {
     if (i.go && get(i.go)) { el.style.cursor = 'pointer'; el.addEventListener('click', () => showPreviewFrame(get(i.go), i.tr || 'none')); if (preview.hot) g.append(el), g.append(sv('rect', { x: i.x, y: i.y, width: i.w, height: i.h, fill: 'rgba(120,120,120,.25)', stroke: '#777', 'stroke-dasharray': '4 3', 'pointer-events': 'none' })); else g.append(el); }
     else g.append(el);
   }
-  const bar = h('div', { class: 'row' }, btn('Back', previewBack), h('span', { class: 'muted', text: f.name }), btn(preview.hot ? 'Hide hotspots' : 'Show hotspots', () => { preview.hot = !preview.hot; showPreviewFrame(f, 'none', true); }), btn('Restart', () => { preview.hist = []; showPreviewFrame(doc.items.find((x) => x.type === 'frame' && !x.hidden), 'none', true); }), btn('Close preview', endPreview));
+  const bar = h('div', { class: 'row pvbar' }, btn('Back', previewBack), h('span', { class: 'pvname', text: f.name }), btn(preview.hot ? 'Hide hotspots' : 'Show hotspots', () => { preview.hot = !preview.hot; showPreviewFrame(f, 'none', true); }), btn('Restart', () => { preview.hist = []; showPreviewFrame(doc.items.find((x) => x.type === 'frame' && !x.hidden), 'none', true); }), btn('Close preview', endPreview));
   back.append(s, bar);
   if (how === 'fade' && s.animate) s.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240 });
   else if (how === 'slide' && s.animate) s.animate([{ transform: 'translateX(60px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'ease-out' });
@@ -803,8 +849,14 @@ function autosave() {
   let svgStr = ''; try { const fr = doc.items.find((i) => i.type === 'frame' && !i.hidden); const r = exportSvgString(fr || null); svgStr = r ? r.str : ''; } catch (e) { /* no picture */ }
   const list = readRecent().filter((e) => e.id !== doc.id);
   list.unshift({ id: doc.id, title: doc.title || 'Untitled design', time: Date.now(), svg: svgStr, doc: s });
-  writeRecent(list.slice(0, getSet('recentMax')));
+  writeRecent(keepRecent(list, getSet('recentMax')));
 }
+// starred designs: a list of Recent ids, kept on this computer. Starred ones never drop off the Recent cap.
+const STAR_KEY = 'frameout.starred';
+function readStars() { try { const r = JSON.parse(localStorage.getItem(STAR_KEY) || '[]'); return new Set(Array.isArray(r) ? r.filter((x) => typeof x === 'string') : []); } catch (e) { return new Set(); } }
+function writeStars(set) { try { localStorage.setItem(STAR_KEY, JSON.stringify([...set])); } catch (e) { /* not saved */ } }
+function toggleStar(id) { const s = readStars(); if (s.has(id)) s.delete(id); else s.add(id); writeStars(s); renderHome(); }
+function keepRecent(list, n) { const st = readStars(); return list.filter((e, k) => k < n || st.has(e.id)); }
 const SET_KEY = 'frameout.settings', SET_DEF = { recentMax: 12, openOn: 'home', sideShut: false };
 function getSet(k) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); const v = s && s[k]; if (k === 'recentMax') return [6, 12, 24].includes(v) ? v : SET_DEF[k]; if (k === 'openOn') return v === 'last' ? 'last' : 'home'; if (k === 'sideShut') return v === true; } catch (e) { /* defaults */ } return SET_DEF[k]; }
 function putSet(k, v) { try { const s = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {}; s[k] = v; localStorage.setItem(SET_KEY, JSON.stringify(s)); } catch (e) { /* not saved */ } }
@@ -821,7 +873,7 @@ function openRecent(e) {
   try { const d = JSON.parse(e.doc); if (!Array.isArray(d.items)) throw new Error('damaged'); startDesign({ id: e.id, title: String(d.title || e.title || 'Untitled design'), items: d.items.map(cleanItem), motion: cleanMotion(d.motion) }); }
   catch (err) { toast('Cannot open this design'); }
 }
-function removeRecent(id) { writeRecent(readRecent().filter((e) => e.id !== id)); renderHome(); }
+function removeRecent(id) { writeRecent(readRecent().filter((e) => e.id !== id)); const s = readStars(); if (s.delete(id)) writeStars(s); renderHome(); }
 function ago(t) { const d = new Date(t), now = new Date(); const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); const diff = Math.round((day(now) - day(d)) / 86400000); const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); return diff <= 0 ? 'Today ' + hm : diff === 1 ? 'Yesterday ' + hm : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); }
 function thumbBox(svgStr, cls = '') { const box = h('div', { class: 'thumb ' + cls }); if (svgStr) box.append(h('img', { src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr), alt: '' })); else box.append(h('span', { class: 'muted', text: 'Empty' })); return box; }
 // starter templates, built in code so they stay small and work offline
@@ -852,20 +904,53 @@ function homeFolderCards() {
   }
   return [h('h2', { text: 'Folders' }), row];
 }
-function homeHome() {
-  const recent = readRecent();
-  const grid = h('div', { class: 'home-grid' });
-  for (const e of recent) {
-    grid.append(h('div', { class: 'hcard', tabindex: 0, role: 'button', onclick: () => openRecent(e), onkeydown: (ev) => { if (ev.key === 'Enter') openRecent(e); } },
-      thumbBox(e.svg), h('div', { class: 'hname', text: e.title || 'Untitled design' }), h('div', { class: 'hsub', text: 'Edited ' + ago(e.time) }),
-      h('button', { class: 'btn hrm', title: 'Remove from recent', onclick: (ev) => { ev.stopPropagation(); removeRecent(e.id); }, text: 'Remove' })));
+const byTime = (list) => [...list].sort((a, b) => (+b.time || 0) - (+a.time || 0));
+function recentGrid(list) {
+  const stars = readStars(), grid = h('div', { class: 'home-grid' });
+  for (const e of list) {
+    const on = stars.has(e.id), name = e.title || 'Untitled design';
+    grid.append(h('div', { class: 'hcard', tabindex: 0, role: 'button', 'aria-label': 'Open ' + name, onclick: () => openRecent(e), onkeydown: (ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) openRecent(e); } },
+      thumbBox(e.svg), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: 'Edited ' + ago(e.time) }),
+      h('div', { class: 'hacts' },
+        h('button', { class: 'hib hstar' + (on ? ' on' : ''), title: on ? 'Remove star' : 'Star', 'aria-label': on ? 'Remove star' : 'Star', 'aria-pressed': on ? 'true' : 'false', onclick: (ev) => { ev.stopPropagation(); toggleStar(e.id); }, onkeydown: (ev) => ev.stopPropagation() }, icon(on ? 'starfill' : 'star', 20)),
+        h('button', { class: 'hib hrm', title: 'Remove from recent', 'aria-label': 'Remove from recent', onclick: (ev) => { ev.stopPropagation(); removeRecent(e.id); }, onkeydown: (ev) => ev.stopPropagation() }, icon('del', 20)))));
   }
-  return [h('h2', { text: 'Start' }), h('div', { class: 'home-row' },
+  return grid;
+}
+const empty = (ic, title, sub) => h('div', { class: 'hempty' }, icon(ic, 40), h('div', { class: 'hname', text: title }), h('div', { class: 'hsub', text: sub }));
+const secHead = (title, extra) => h('div', { class: 'hsechd' }, h('h2', { text: title }), h('span', { class: 'grow' }), extra || null);
+function homeHome() {
+  const recent = byTime(readRecent()), more = recent.length > 6;
+  return [h('div', { class: 'home-row' },
     newCard('plus', 'New design', 'Start with an empty canvas', () => newBlank()),
     newCard('open', 'Open file', 'A .frameout file from your computer', () => openDoc()),
     newCard('example', 'Example', 'Two linked mobile screens to explore', () => startDesign(sampleDoc()))),
   ...homeFolderCards(),
-  h('h2', { text: 'Recent' }), recent.length ? grid : h('div', { class: 'muted', style: 'padding:8px 2px', text: 'Designs you work on appear here, with a small picture, and are kept on this computer.' })];
+  secHead('Recent designs', more ? h('button', { class: 'btn text', onclick: () => { homeTab = 'recent'; renderHome(); }, text: 'View all' }) : null),
+  recent.length ? recentGrid(recent.slice(0, 6)) : empty('recent', 'No designs yet', 'Designs you work on appear here, with a small picture, and are kept on this computer.')];
+}
+function homeRecent() {
+  const recent = byTime(readRecent());
+  return [h('div', { class: 'hsub', style: 'margin:-8px 2px 18px', text: recent.length === 1 ? '1 design, newest first' : recent.length + ' designs, newest first' }),
+    recent.length ? recentGrid(recent) : empty('recent', 'No designs yet', 'Designs you work on appear here, with a small picture, and are kept on this computer.')];
+}
+function homeStarred() {
+  const st = readStars(), list = byTime(readRecent().filter((e) => st.has(e.id)));
+  return [list.length ? recentGrid(list) : empty('star', 'No starred designs', 'Press the star on a design to keep it here. Starred designs are never dropped from Recent.')];
+}
+// keyboard shortcuts, the same keys the editor listens for
+const SHORTCUTS = [
+  ['Tools', [['V', 'Move'], ['H', 'Hand'], ['F', 'Frame'], ['R', 'Rectangle'], ['O', 'Ellipse'], ['L', 'Line'], ['Shift+L', 'Arrow'], ['P', 'Pen'], ['Shift+P', 'Pencil'], ['T', 'Text'], ['Shift+I', 'Image']]],
+  ['Edit', [['Ctrl+Z', 'Undo'], ['Ctrl+Y', 'Redo'], ['Ctrl+C', 'Copy'], ['Ctrl+V', 'Paste'], ['Ctrl+D', 'Duplicate'], ['Del', 'Delete'], ['Ctrl+A', 'Select all'], ['Arrows', 'Nudge 1 px'], ['Shift+Arrows', 'Nudge 10 px'], ['Enter', 'Finish pen path'], ['Esc', 'Deselect or close']]],
+  ['File and view', [['Ctrl+S', 'Save'], ['Ctrl+O', 'Open'], ['Scroll', 'Pan'], ['Space', 'Hold to pan'], ['Ctrl+Scroll', 'Zoom']]],
+];
+function showHelp() {
+  if (document.querySelector('.modal-back.help')) return;
+  const back = h('div', { class: 'modal-back help' }); const close = () => back.remove();
+  const cols = h('div', { class: 'keys' }, SHORTCUTS.map(([g, list]) => h('div', { class: 'kgrp' }, h('h3', { text: g }), list.map(([k, what]) => h('div', { class: 'krow' }, h('span', { text: what }), h('span', { class: 'kk' }, k.split('+').map((x) => h('kbd', { text: x }))))))));
+  back.append(h('div', { class: 'modal wide', role: 'dialog', 'aria-label': 'Keyboard shortcuts' }, h('h2', { text: 'Keyboard shortcuts' }), cols, h('div', { class: 'frow', style: 'margin:0;justify-content:flex-end' }, h('button', { class: 'btn primary', text: 'Close', onclick: close }))));
+  back.addEventListener('pointerdown', (e) => { if (e.target === back) close(); });
+  document.body.append(back);
 }
 function homeTemplates() {
   const grid = h('div', { class: 'home-grid' });
@@ -884,8 +969,8 @@ function homeSettings() {
   const mb = bytes > 1e6 ? (bytes / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1000)) + ' KB';
   return [h('div', { class: 'settings' },
     row('When Frameout opens', 'Show this home screen, or jump back into the design you edited last.', pick([['home', 'Home'], ['last', 'Last design']], getSet('openOn'), (v) => putSet('openOn', v))),
-    row('Recent designs to keep', 'More designs use more space on this computer. Older ones drop off first.', pick([[6, '6'], [12, '12'], [24, '24']], getSet('recentMax'), (v) => { putSet('recentMax', v); writeRecent(readRecent().slice(0, v)); })),
-    row('Space used by Recent', mb + ' on this computer. Saved .frameout files are not affected.', btn('Clear recent', () => { if (!readRecent().length) return; if (confirm('Remove all designs from Recent? Files you saved are not touched.')) { writeRecent([]); renderHome(); toast('Recent cleared'); } })),
+    row('Recent designs to keep', 'More designs use more space on this computer. Older ones drop off first. Starred designs are always kept.', pick([[6, '6'], [12, '12'], [24, '24']], getSet('recentMax'), (v) => { putSet('recentMax', v); writeRecent(keepRecent(readRecent(), v)); })),
+    row('Space used by Recent', mb + ' on this computer. Saved .frameout files are not affected.', btn('Clear recent', () => { if (!readRecent().length) return; if (confirm('Remove all designs from Recent, starred ones too? Files you saved are not touched.')) { writeRecent([]); writeStars(new Set()); renderHome(); toast('Recent cleared'); } })),
     row('Privacy', 'Frameout never connects to the internet. Your designs stay on this computer.', h('span')),
     row('About', 'Frameout, part of the Lookout apps. Works fully offline.', h('span')))];
 }
@@ -928,19 +1013,28 @@ function homeFolder(key) {
 }
 function renderHome() {
   home.textContent = '';
-  const tabs = [['home', 'Home', 'home'], ['templates', 'Templates', 'templates'], ['settings', 'Settings', 'settings']];
+  // drawer categories (ruling): Home, Recent, Starred, Templates; Settings and Help pinned at the bottom
+  const tabs = [['home', 'Home', 'home'], ['recent', 'Recent', 'recent'], ['starred', 'Starred', 'star'], ['templates', 'Templates', 'templates']];
+  if (!['home', 'recent', 'starred', 'templates', 'settings'].includes(homeTab) && !(FOLDERS_UI && homeTab.startsWith('folder:'))) homeTab = 'home';
   const shut = getSet('sideShut');
-  const side = h('nav', { class: 'home-side' + (shut ? ' shut' : '') },
-    h('div', { class: 'home-logo' }, h('button', { class: 'htab hbar', title: shut ? 'Open sidebar' : 'Close sidebar', 'aria-label': 'Toggle sidebar', onclick: () => { putSet('sideShut', !shut); renderHome(); } }, h('span', { class: 'hic' }, icon('menu'))), h('span', { class: 'hlabel', text: 'Frameout' })),
-    tabs.map(([id, name, ic]) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), title: name, onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic' }, icon(ic)), h('span', { class: 'hlabel', text: name }))),
+  const tab = (id, name, ic) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), title: name, 'aria-current': homeTab === id ? 'page' : null, onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic' }, icon(homeTab === id && ic === 'star' ? 'starfill' : ic)), h('span', { class: 'hlabel', text: name }));
+  const side = h('nav', { class: 'home-side' + (shut ? ' shut' : ''), 'aria-label': 'Frameout home' },
+    h('div', { class: 'home-logo' }, h('button', { class: 'htab hbar', title: shut ? 'Open sidebar' : 'Close sidebar', 'aria-label': 'Toggle sidebar', onclick: () => { putSet('sideShut', !shut); renderHome(); } }, h('span', { class: 'hic' }, icon('menu'))), h('img', { class: 'hlabel hmark', src: 'brand.svg', alt: '' }), h('span', { class: 'hlabel', text: 'Frameout' })),
+    h('button', { class: 'hnew', title: 'New design', 'aria-label': 'New design', onclick: () => newBlank() }, icon('plus', 24), h('span', { class: 'hlabel', text: 'New design' })),
+    session ? h('button', { class: 'htab hback', title: 'Back to design', onclick: closeHome }, h('span', { class: 'hic' }, icon('back')), h('span', { class: 'hlabel', text: 'Back to design' })) : null,
+    h('div', { class: 'hnav' }, tabs.map(([id, name, ic]) => tab(id, name, ic))),
     ...(FOLDERS_UI ? [    h('div', { class: 'hsec' }, h('span', { class: 'hlabel', text: 'Folders' }), h('button', { class: 'hplus', title: 'New folder', 'aria-label': 'New folder', onclick: addFolder }, icon('plus', 16))),
     h('div', { class: 'hfolders' }, folders.map((f) => h('button', { class: 'htab' + (homeTab === 'folder:' + f.path ? ' on' : ''), title: f.path, onclick: () => { homeTab = 'folder:' + f.path; loadFolderFiles(f.path); renderHome(); } }, h('span', { class: 'hic' }, icon('open')), h('span', { class: 'hlabel', text: f.name })))), 
     shut ? h('button', { class: 'htab', title: 'New folder', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus'))) : (folders.length ? h('span') : h('button', { class: 'htab', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus')), h('span', { class: 'hlabel', text: 'New folder' })))] : []),
-    h('span', { class: 'grow' }), session ? h('button', { class: 'htab', onclick: closeHome }, h('span', { class: 'hic' }, icon('back')), h('span', { class: 'hlabel', text: 'Back to design' })) : h('span'));
+    h('span', { class: 'grow' }),
+    h('div', { class: 'hnav hfoot' }, tab('settings', 'Settings', 'settings'), h('button', { class: 'htab', title: 'Help', onclick: () => showHelp() }, h('span', { class: 'hic' }, icon('help')), h('span', { class: 'hlabel', text: 'Help' }))));
   const isF = FOLDERS_UI && homeTab.startsWith('folder:'), fkey = isF ? homeTab.slice(7) : '', fo = isF ? folders.find((x) => x.path === fkey) : null;
-  const body = homeTab === 'templates' ? homeTemplates() : homeTab === 'settings' ? homeSettings() : isF ? homeFolder(fkey) : homeHome();
-  home.append(side, h('div', { class: 'home-main' }, h('div', { class: 'home-in' },
-    h('div', { class: 'home-head' }, h('h1', { text: homeTab === 'templates' ? 'Templates' : homeTab === 'settings' ? 'Settings' : isF ? (fo ? fo.name : 'Folder') : 'Home' }), h('span', { class: 'grow' }), homeTab === 'templates' || homeTab === 'settings' ? h('span') : btn('New design', () => newBlank(isF && fo ? { key: fkey, name: fo.name } : null), 'primary')), ...body)));
+  const body = homeTab === 'templates' ? homeTemplates() : homeTab === 'settings' ? homeSettings() : homeTab === 'recent' ? homeRecent() : homeTab === 'starred' ? homeStarred() : isF ? homeFolder(fkey) : homeHome();
+  const TITLES = { home: 'Welcome to Frameout', recent: 'Recent', starred: 'Starred', templates: 'Templates', settings: 'Settings' };
+  const head = h('div', { class: 'home-head' + (homeTab === 'home' ? ' hero' : '') }, h('div', {}, h('h1', { text: isF ? (fo ? fo.name : 'Folder') : TITLES[homeTab] }),
+    homeTab === 'home' ? h('div', { class: 'hlead', text: 'Design screens, link them into a prototype and bring them to life with motion.' }) : null),
+    h('span', { class: 'grow' }), isF && fo ? btn('New design', () => newBlank({ key: fkey, name: fo.name }), 'primary') : null);
+  home.append(side, h('div', { class: 'home-main' }, h('div', { class: 'home-in' }, head, ...body)));
 }
 const SIZES = [
   ['Phone', [['iPhone', 393, 852], ['Android', 360, 800], ['Small phone', 320, 568]]],

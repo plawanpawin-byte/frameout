@@ -142,6 +142,7 @@
   let lastToggle = 0;
   function wsPoke() { window.dispatchEvent(new Event('resize')); }
   function wsToggle(side) { ws.c[side] = !ws.c[side]; lastToggle = Date.now(); wsSave(); sweep(); wsPoke(); }
+  window.lkPanel = wsToggle; // lets an app's own panel-header button fold its panel the same way the grip does
   function wsBind(g) {
     const box = () => [...document.querySelectorAll('.sidebar')].find((s) => sideOf(s) === g.dataset.side && (g.dataset.side === 'left' ? s.nextElementSibling === g : s.previousElementSibling === g));
     g.addEventListener('pointerdown', (e) => {
