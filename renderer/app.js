@@ -948,16 +948,28 @@ const RECENT_KEY = 'frameout.recent';
 let homeOpen = false, session = false, lastSaved = '';
 const home = h('div', { class: 'home' }); app.append(home);
 const readRecent = () => { try { const r = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); return Array.isArray(r) ? r.filter((e) => e && e.id && typeof e.doc === 'string') : []; } catch (e) { return []; } };
-function writeRecent(list) { for (;;) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); return; } catch (e) { if (list.length <= 1) return; list = list.slice(0, -1); } } }
+// when the disk store is full, the oldest designs that are not starred go first, then the oldest starred ones;
+// the open design (cur) is never dropped, only its picture as a last try. Says whether the list was written.
+function writeRecent(list, cur) {
+  const st = readStars(); list = list.slice();
+  const drop = (keep) => { for (let k = list.length - 1; k >= 0; k--) if (list[k].id !== cur && !keep(list[k])) { list.splice(k, 1); return true; } return false; };
+  for (;;) {
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); return true; } catch (e) {
+      if (drop((x) => st.has(x.id)) || drop(() => false)) continue;
+      const c = list.find((x) => x.id === cur); if (c && c.svg) { c.svg = ''; continue; } return false;
+    }
+  }
+}
+let recentOk = true;   // false when the last autosave could not keep the open design in Recent
 // keeps the open design in the Recent list (like Figma drafts), with a small picture of its first screen
 function autosave() {
   if (!session || !doc.items.length) return;
   if (!doc.id) doc.id = uid();
-  const s = JSON.stringify(restDoc()); if (s === lastSaved) return; lastSaved = s;
+  const s = JSON.stringify(restDoc()); if (s === lastSaved) return;
   let svgStr = ''; try { const fr = doc.items.find((i) => i.type === 'frame' && !i.hidden); const r = exportSvgString(fr || null); svgStr = r ? r.str : ''; } catch (e) { /* no picture */ }
   const list = readRecent().filter((e) => e.id !== doc.id);
   list.unshift({ id: doc.id, title: doc.title || 'Untitled design', time: Date.now(), svg: svgStr, doc: s });
-  writeRecent(keepRecent(list, getSet('recentMax')));
+  recentOk = writeRecent(keepRecent(list, getSet('recentMax')), doc.id); lastSaved = recentOk ? s : '';
 }
 // starred designs: a list of Recent ids, kept on this computer. Starred ones never drop off the Recent cap.
 const STAR_KEY = 'frameout.starred';
@@ -1166,4 +1178,10 @@ window.addEventListener('drop', async (e) => {
 let savedSnap = null;
 setTimeout(() => { if (savedSnap === null) savedSnap = fileSnap(); }, 0);
 // an empty design is not held back: there is nothing to lose, and autosave keeps no copy of it in Recent
-window.addEventListener('beforeunload', (e) => { if (savedSnap !== null && doc.items.length && fileSnap() !== savedSnap) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', (e) => {
+  if (savedSnap !== null && doc.items.length && fileSnap() !== savedSnap) {
+    autosave(); // keep the latest changes in Recent, and tell the close question whether that worked
+    try { window.host.closeNote(!recentOk || !doc.items.length); } catch (err) { /* older shell */ }
+    e.preventDefault(); e.returnValue = '';
+  }
+});
