@@ -55,6 +55,7 @@ let undoS = [], redoS = [], clip = null, preview = null;
 const snapshot = () => JSON.stringify(doc);
 // what a saved file holds (animated layers at rest), so a moved playhead is not an unsaved change
 const fileSnap = () => JSON.stringify(restDoc());
+let shownText = null;   // the text layer last edited in the Text box (see dropEmptyText)
 function commit() { undoS.push(snapshot()); if (undoS.length > 100) undoS.shift(); redoS = []; }
 // a pen path or a mouse drag in progress belongs to the history step being undone, so end it first
 function endOps() { if (drag) { if (drag.r) drag.r.remove(); drag = null; } if (pen) { pen = null; setTool('select'); } }
@@ -372,7 +373,7 @@ function itemEl(i, forExport = false) {
 }
 function render() {
   if (document.activeElement !== titleInput) { titleInput.value = doc.title || ''; titleOld = null; }
-  syncInstances(); applyLayouts(); syncRest();
+  dropEmptyText(); syncInstances(); applyLayouts(); syncRest();
   gItems.textContent = ''; gUI.textContent = '';
   for (const i of doc.items) gItems.append(itemEl(i));
   for (const id of sel) {
@@ -440,6 +441,14 @@ function renderRight() {
   buildRight();
   if (keep) { const el = all()[keep.n]; if (el && (el.closest('label') || {}).textContent === keep.l) el.focus(); }
 }
+// a text layer emptied in the Text box is invisible, so it goes away once it is no longer selected.
+// It joins the history step of that edit, so one undo brings the old text back.
+function dropEmptyText() {
+  const t = shownText; if (!t || sel.has(t.id)) return; shownText = null;
+  const c = get(t.id); if (!c || c.type !== 'text' || String(c.text || '').trim()) return;
+  doc.items = doc.items.filter((x) => x !== c); for (const x of doc.items) if (x.go === t.id) x.go = '';
+  if (doc.motion) delete doc.motion.tracks[t.id];
+}
 function buildRight() {
   right.textContent = '';
   if (mode === 'dev') { right.append(phead('Code', 'right')); renderDev(); return; }
@@ -474,6 +483,7 @@ function buildRight() {
   }
   if (i.type === 'text') {
     const ta = h('textarea', { rows: 3, style: 'width:100%' }); ta.value = i.text; ta.addEventListener('input', commit, { once: true }); ta.addEventListener('input', () => { i.text = ta.value; if (i.instOf || i.inst) i.ov = true; const lines = ta.value.split('\n'); i.h = lines.length * i.fs * 1.25 + 4; if ((i.ta || 'left') === 'left') i.w = Math.max(40, Math.max(...lines.map((l) => l.length)) * i.fs * 0.55); renderItemsOnly(); });
+    if (!i.instOf && !i.inst) ta.addEventListener('input', () => { shownText = i; }, { once: true });
     right.append(h('h3', { text: 'Text' }), ta, num('Font size', 'fs'));
     if (focusText) { focusText = false; setTimeout(() => { const t = right.querySelector('textarea'); if (t) { t.focus(); t.select(); } }, 80); }
     right.lastChild.querySelector('input').addEventListener('change', () => { for (const it of items) { if (it.type !== 'text') continue; const lines = it.text.split('\n'); it.h = lines.length * it.fs * 1.25 + 4; if ((it.ta || 'left') === 'left') it.w = Math.max(40, Math.max(...lines.map((l) => l.length)) * it.fs * 0.55); } render(); });
