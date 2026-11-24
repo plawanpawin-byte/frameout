@@ -74,7 +74,7 @@ At the right end of the bar are four mode buttons:
   ![Draw mode](screenshots/18-draw.png)
 
 - **Design** is the normal editor (frames, components, auto layout, prototype preview).
-- **Motion** adds a timeline. Select a layer, put the playhead on a time and press **Add keyframe**; move the playhead, change the layer's position, size, rotation or opacity, and add another. Choose easing (linear, ease in, ease out, ease in-out), set the duration, drag the playhead to scrub, and press **Play** (with optional **Loop**). Animations are saved in the file. Layers rest at their time-0 position when you leave Motion mode or save.
+- **Motion** adds a timeline. Select a layer, put the playhead on a time and press **Add keyframe**; move the playhead, change the layer's position, size, rotation or opacity, and add another. Turn on **Auto keyframe** and any move, resize, rotation, opacity or arrow-key change you make at the playhead is recorded as a keyframe for you (add the starting keyframe first, at time 0). Choose easing (linear, ease in, ease out, ease in-out), set the duration, drag the playhead to scrub, and press **Play** (with optional **Loop**). Animations are saved in the file. Layers rest at their time-0 position when you leave Motion mode or save.
 
   ![Motion mode](screenshots/16-motion.png)
 
@@ -82,7 +82,7 @@ At the right end of the bar are four mode buttons:
 
   ![Dev mode](screenshots/17-dev.png)
 
-Not in these modes yet: curved (Bézier) pen handles, brushes, boolean shape operations, automatic keyframes, exporting an animation as a video or GIF, version comparison and developer integrations.
+Not in these modes yet: curved (Bézier) pen handles, brushes, boolean shape operations, exporting an animation as a video or GIF, version comparison and developer integrations.
 
 ### Pictures, rotation, gradients, shadows and text styles
 
@@ -105,6 +105,8 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 3. Press **Preview** and click through your screens, then export one as an image.
 
 ## What is new
+
+**1.0.27:** Auto keyframe in Motion mode.
 
 **1.0.26:** New design opens an empty, zoomed-out canvas with no size question (sizes are now a preset list in the frame's panel). Tools are grouped in dropdown menus like Figma, with new Arrow, Polygon, Star, Pen and Pencil tools, and four modes at the end of the bar: Draw, Design, Motion (keyframe timeline) and Dev (inspect, CSS, annotations).
 

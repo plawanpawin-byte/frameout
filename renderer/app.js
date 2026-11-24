@@ -366,7 +366,7 @@ function renderRight() {
   const items = [...sel].map(get).filter(Boolean); if (!items.length) { right.append(h('h3', { text: 'Tips' }), h('div', { class: 'muted', style: 'font-size:12px;line-height:1.6;white-space:pre-line', text: 'Pick a tool or press its letter, then drag on the canvas.\nShift-click to select several.\nScroll to pan, Ctrl+scroll to zoom, hold Space to pan.\nGive a shape a Link to a frame, then press Preview to click through your prototype.' })); return; }
   const i = items[0];
   let nameUndo = false;
-  const num = (label, key) => h('label', { class: 'field' }, label, h('input', { type: 'number', value: Math.round(i[key] * 10) / 10, style: 'width:100%', onchange: (e) => { const v = +e.target.value; if (!isNaN(v)) { commit(); items.forEach((it) => { if (['w', 'h'].includes(key)) it[key] = Math.max(1, v); else it[key] = v; }); render(); } } }));
+  const num = (label, key) => h('label', { class: 'field' }, label, h('input', { type: 'number', value: Math.round(i[key] * 10) / 10, style: 'width:100%', onchange: (e) => { const v = +e.target.value; if (!isNaN(v)) { commit(); items.forEach((it) => { if (['w', 'h'].includes(key)) it[key] = Math.max(1, v); else it[key] = v; }); autoKeyFor(items); render(); } } }));
   right.append(h('h3', { text: 'Layout' }), h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:6px' }, num('X', 'x'), num('Y', 'y'), num('W', 'w'), num('H', 'h')));
   right.append(h('label', { class: 'field' }, 'Name', h('input', { type: 'text', value: i.name, oninput: (e) => { if (!nameUndo) { commit(); nameUndo = true; } i.name = e.target.value; renderLeft(); } })));
   if (i.type !== 'line') {
@@ -374,10 +374,10 @@ function renderRight() {
   }
   right.append(h('h3', { text: 'Stroke' }), h('div', { class: 'swatches' }, ['#000000', '#4a4a4a', '#8a8a8a', '#e4e4e4', '#ffffff'].map((c) => h('button', { style: `background:${c}`, onclick: () => { commit(); items.forEach((it) => { it.stroke = c; if (!it.sw) it.sw = 1; }); render(); } }))));
   right.append(h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:6px' }, num('Stroke width', 'sw'), i.type === 'rect' || i.type === 'frame' ? num('Corner radius', 'r') : h('span')));
-  const op = h('input', { type: 'range', min: 5, max: 100, value: Math.round(i.op * 100), oninput: () => { items.forEach((it) => (it.op = op.value / 100)); renderItemsOnly(); } }); op.addEventListener('pointerdown', commit);
+  const op = h('input', { type: 'range', min: 5, max: 100, value: Math.round(i.op * 100), oninput: () => { items.forEach((it) => (it.op = op.value / 100)); renderItemsOnly(); } }); op.addEventListener('pointerdown', commit); op.addEventListener('change', () => { autoKeyFor(items); render(); });
   right.append(h('h3', { text: 'Opacity' }), op);
   const chk = (label, on, fn) => h('label', { class: 'field', style: 'flex-direction:row;gap:6px;align-items:center' }, h('input', { type: 'checkbox', checked: !!on, onchange: (e) => { commit(); fn(e.target.checked); render(); } }), label);
-  const numTo = (label, val, fn, step) => h('label', { class: 'field' }, label, h('input', { type: 'number', step: step || 1, value: Math.round(val * 100) / 100, style: 'width:100%', onchange: (e) => { const v = +e.target.value; if (!isNaN(v)) { commit(); fn(v); render(); } } }));
+  const numTo = (label, val, fn, step) => h('label', { class: 'field' }, label, h('input', { type: 'number', step: step || 1, value: Math.round(val * 100) / 100, style: 'width:100%', onchange: (e) => { const v = +e.target.value; if (!isNaN(v)) { commit(); fn(v); autoKeyFor(items); render(); } } }));
   if (i.type === 'polygon' || i.type === 'star') right.append(h('h3', { text: i.type === 'star' ? 'Star' : 'Polygon' }), numTo(i.type === 'star' ? 'Points (3 to 12)' : 'Sides (3 to 12)', i.n || (i.type === 'star' ? 5 : 3), (v) => items.forEach((it) => { if (it.type === 'polygon' || it.type === 'star') it.n = clamp(Math.round(v), 3, 12); })));
   if (i.type === 'path') right.append(h('h3', { text: 'Path' }), chk('Closed shape', i.cl, (on) => items.forEach((it) => { if (it.type === 'path') { it.cl = on; if (on && it.fill === 'none') it.fill = '#d0d0d0'; } })), chk('Smooth curve', i.sm, (on) => items.forEach((it) => { if (it.type === 'path') it.sm = on; })));
   if (i.type === 'line') right.append(h('h3', { text: 'Line end' }), chk('Arrow head', i.ah, (on) => items.forEach((it) => { if (it.type === 'line') it.ah = on; })));
@@ -425,7 +425,7 @@ function renderItemsOnly() { syncInstances(); applyLayouts(); gItems.textContent
 // ---------- motion (keyframe animation) ----------
 const ESS = { linear: (u) => u, in: (u) => u * u, out: (u) => 1 - (1 - u) * (1 - u), inout: (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2) };
 const KEYS = ['x', 'y', 'w', 'h', 'rot', 'op'];
-let playhead = 0, playing = false, playRaf = 0, motionEase = 'inout', noTl = false, tlRefs = null;
+let autoKey = false, playhead = 0, playing = false, playRaf = 0, motionEase = 'inout', noTl = false, tlRefs = null;
 const tl = h('div', { class: 'tl' }); stage.append(tl);
 function cleanMotion(m) {
   if (!m || typeof m !== 'object') return undefined;
@@ -449,12 +449,17 @@ function restDoc() {
   if (!hasMotion()) return doc;
   const c = JSON.parse(JSON.stringify(doc)); for (const id of Object.keys(c.motion.tracks)) { const it = c.items.find((x) => x.id === id), k = c.motion.tracks[id]; if (it && k.length) { const p = poseOf(k, 0); for (const key of KEYS) it[key] = p[key]; } } return c;
 }
+function keyAt(it) {
+  const m = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); const k = m.tracks[it.id] || (m.tracks[it.id] = []);
+  for (let n = k.length - 1; n >= 0; n--) if (Math.abs(k[n].t - playhead) < 20) k.splice(n, 1);
+  const e = { t: Math.round(playhead), e: motionEase }; for (const key of KEYS) e[key] = key === 'rot' ? it.rot || 0 : it[key]; k.push(e); k.sort((a, b) => a.t - b.t);
+}
 function addKey() {
   const it = sel.size === 1 ? get([...sel][0]) : null; if (!it) { toast('Select one layer first'); return; }
-  commit(); const m = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); const k = m.tracks[it.id] || (m.tracks[it.id] = []);
-  for (let n = k.length - 1; n >= 0; n--) if (Math.abs(k[n].t - playhead) < 20) k.splice(n, 1);
-  const e = { t: Math.round(playhead), e: motionEase }; for (const key of KEYS) e[key] = key === 'rot' ? it.rot || 0 : it[key]; k.push(e); k.sort((a, b) => a.t - b.t); render();
+  commit(); keyAt(it); render();
 }
+// with Auto keyframe on, changing a layer in Motion mode records a keyframe at the playhead by itself
+function autoKeyFor(list) { if (mode !== 'motion' || !autoKey) return; for (const it of list) if (it && it.type !== undefined) keyAt(it); }
 function delKey() {
   const it = sel.size === 1 ? get([...sel][0]) : null, k = it && doc.motion && doc.motion.tracks[it.id]; if (!k) { toast('No keyframe on this layer'); return; }
   const n = k.findIndex((e) => Math.abs(e.t - playhead) < 20); if (n < 0) { toast('Move the playhead onto a keyframe'); return; }
@@ -489,7 +494,7 @@ function renderTimeline() {
     return h('div', { class: 'trk' }, h('span', { class: 'trn', text: it.name }), lane);
   });
   tl.append(h('div', { class: 'tlh' }, play, time, h('label', { class: 'tlf' }, 'Duration (s)', h('input', { type: 'number', min: 0.2, max: 60, step: 0.5, value: m.dur / 1000, style: 'width:64px', onchange: (ev) => { const v = +ev.target.value; if (!(v >= 0.2 && v <= 60)) { ev.target.value = m.dur / 1000; return; } commit(); const mm = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); mm.dur = Math.round(v * 1000); if (playhead > mm.dur) playhead = mm.dur; render(); } })),
-    h('label', { class: 'tlf' }, h('input', { type: 'checkbox', checked: !!m.loop, onchange: (ev) => { commit(); const mm = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); mm.loop = ev.target.checked; } }), 'Loop'), h('span', { class: 'tlf' }, 'Easing', ease), btn('Add keyframe', addKey, 'primary'), btn('Delete keyframe', delKey)), range,
+    h('label', { class: 'tlf' }, h('input', { type: 'checkbox', 'aria-label': 'Auto keyframe', checked: autoKey, onchange: (ev) => { autoKey = ev.target.checked; } }), 'Auto keyframe'), h('label', { class: 'tlf' }, h('input', { type: 'checkbox', checked: !!m.loop, onchange: (ev) => { commit(); const mm = doc.motion || (doc.motion = { dur: 2000, loop: false, tracks: {} }); mm.loop = ev.target.checked; } }), 'Loop'), h('span', { class: 'tlf' }, 'Easing', ease), btn('Add keyframe', addKey, 'primary'), btn('Delete keyframe', delKey)), range,
     h('div', { class: 'tracks' }, tracks.length ? tracks : h('div', { class: 'muted', style: 'padding:6px 4px;font-size:12px', text: 'Select a layer, put the playhead on a time, press Add keyframe. Move the playhead, change the layer (position, size, rotation or opacity) and add another keyframe.' })));
   tlRefs = { time, range, play, phs }; updateTl();
 }
@@ -658,6 +663,7 @@ svg.addEventListener('pointermove', (ev) => {
 function renderLite() { renderItemsOnly(); render(); }
 svg.addEventListener('pointerup', () => {
   if (!drag) return; const d = drag; drag = null;
+  if ((d.mode === 'move' && d.moved) || d.mode === 'resize') autoKeyFor([...sel].map(get));
   if (d.mode === 'pencil') { if (d.abs.length < 2) { doc.items = doc.items.filter((x) => x !== d.it); undoS.pop(); sel.clear(); } setTool('select'); render(); return; }
   if (d.mode === 'draw') {
     const i = d.i;
@@ -688,7 +694,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Delete' || e.key === 'Backspace') del();
   else if (e.key === 'Enter' && pen) { penFinish(false); }
   else if (e.key === 'Escape') { if (fly) { closeFly(); return; } if (pen) { penFinish(false); return; } sel.clear(); setTool('select'); render(); }
-  else if (e.key.startsWith('Arrow') && sel.size) { e.preventDefault(); const d = e.shiftKey ? 10 : 1; commit(); doc.items.filter((i) => sel.has(i.id)).forEach((i) => { if (e.key === 'ArrowLeft') i.x -= d; if (e.key === 'ArrowRight') i.x += d; if (e.key === 'ArrowUp') i.y -= d; if (e.key === 'ArrowDown') i.y += d; }); render(); }
+  else if (e.key.startsWith('Arrow') && sel.size) { e.preventDefault(); const d = e.shiftKey ? 10 : 1; commit(); doc.items.filter((i) => sel.has(i.id)).forEach((i) => { if (e.key === 'ArrowLeft') i.x -= d; if (e.key === 'ArrowRight') i.x += d; if (e.key === 'ArrowUp') i.y -= d; if (e.key === 'ArrowDown') i.y += d; }); autoKeyFor(doc.items.filter((i) => sel.has(i.id))); render(); }
   else if (!e.ctrlKey && e.shiftKey && (k === 'l' || k === 'p')) setTool(k === 'l' ? 'arrow' : 'pencil');
   else if (!e.ctrlKey && mode !== 'dev' && 'vhfrolpt'.includes(k) && k.length === 1) { const t = { v: 'select', h: 'hand', f: 'frame', r: 'rect', o: 'ellipse', l: 'line', p: 'pen', t: 'text' }[k]; if (mode === 'design' || ['select', 'hand', 'rect', 'ellipse', 'line', 'pen'].includes(t)) setTool(t); }
 });
