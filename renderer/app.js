@@ -829,8 +829,11 @@ document.addEventListener('keydown', (e) => {
   if (fly && !document.querySelector('.modal-back')) { // open menu: Esc closes it and gives focus back, arrows move between items
     if (e.key === 'Escape') { e.preventDefault(); closeFly(true); return; }
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && fly.contains(e.target)) { e.preventDefault(); fly.classList.add('kb'); const it = [...fly.querySelectorAll('.fi')], i = it.indexOf(e.target); it[(i + (e.key === 'ArrowDown' ? 1 : it.length - 1)) % it.length].focus(); return; }
+    return; // any other key belongs to the menu: Tab, Enter and Space keep their normal job, shortcuts wait until it closes
   }
   if (e.target.matches('input,textarea,select')) return;
+  // Delete on a focused Hide/Lock/Insert button in the layer list is not meant for the selected layers
+  if ((e.key === 'Delete' || e.key === 'Backspace') && e.target.matches('button') && left.contains(e.target)) return;
   // a focused button keeps Space and Enter (they press it); other shortcuts still work after clicking one
   if (document.querySelector('.modal-back') || (!e.ctrlKey && !e.metaKey && (e.target.matches('[contenteditable]') || (e.target.matches('button') && (e.key === 'Enter' || e.code === 'Space'))))) return;
   const k = e.key.toLowerCase();
@@ -853,6 +856,8 @@ document.addEventListener('keydown', (e) => {
   else if (!e.ctrlKey && 'vhfrolpt'.includes(k) && k.length === 1) { const t = { v: 'select', h: 'hand', f: 'frame', r: 'rect', o: 'ellipse', l: 'line', p: 'pen', t: 'text' }[k]; if (offered(t)) setTool(t); }
 });
 document.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = false; });
+// a toolbar or dock button clicked with the mouse lets go of focus, so Space pans the canvas instead of pressing it again
+document.addEventListener('pointerup', (e) => { const b = e.target.closest && e.target.closest('.toolbar button,.dock button'); if (b) setTimeout(() => { if (document.activeElement === b) b.blur(); }, 0); });
 
 // ---------- prototype preview ----------
 function startPreview() {
