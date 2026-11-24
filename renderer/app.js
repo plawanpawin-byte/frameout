@@ -841,8 +841,9 @@ function tpl(title, specs) {
 function docThumb(d) { const keep = doc; let s = ''; try { doc = d; const fr = d.items.find((i) => i.type === 'frame'); const r = exportSvgString(fr || null); s = r ? r.str : ''; } catch (e) { /* no picture */ } doc = keep; return s; }
 function newCard(ic, name, sub, fn) { return h('button', { class: 'hcard', onclick: fn }, h('div', { class: 'thumb plus' }, icon(ic, 40)), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })); }
 const folderThumbs = {};
+const FOLDERS_UI = false; // folders hidden on request; the code and any saved folders stay
 function homeFolderCards() {
-  if (!folders.length) return [];
+  if (!FOLDERS_UI || !folders.length) return [];
   const row = h('div', { class: 'home-row' });
   for (const f of folders) {
     if (!folderThumbs[f.path]) { folderThumbs[f.path] = { files: [] }; window.host.folders.files(f.path).then((r) => { folderThumbs[f.path] = { files: r.files.slice(0, 3).map(parseDesignFile).filter(Boolean) }; if (homeOpen && homeTab === 'home') renderHome(); }).catch(() => {}); }
@@ -932,11 +933,11 @@ function renderHome() {
   const side = h('nav', { class: 'home-side' + (shut ? ' shut' : '') },
     h('div', { class: 'home-logo' }, h('button', { class: 'htab hbar', title: shut ? 'Open sidebar' : 'Close sidebar', 'aria-label': 'Toggle sidebar', onclick: () => { putSet('sideShut', !shut); renderHome(); } }, h('span', { class: 'hic' }, icon('menu'))), h('span', { class: 'hlabel', text: 'Frameout' })),
     tabs.map(([id, name, ic]) => h('button', { class: 'htab' + (homeTab === id ? ' on' : ''), title: name, onclick: () => { homeTab = id; renderHome(); } }, h('span', { class: 'hic' }, icon(ic)), h('span', { class: 'hlabel', text: name }))),
-    h('div', { class: 'hsec' }, h('span', { class: 'hlabel', text: 'Folders' }), h('button', { class: 'hplus', title: 'New folder', 'aria-label': 'New folder', onclick: addFolder }, icon('plus', 16))),
+    ...(FOLDERS_UI ? [    h('div', { class: 'hsec' }, h('span', { class: 'hlabel', text: 'Folders' }), h('button', { class: 'hplus', title: 'New folder', 'aria-label': 'New folder', onclick: addFolder }, icon('plus', 16))),
     h('div', { class: 'hfolders' }, folders.map((f) => h('button', { class: 'htab' + (homeTab === 'folder:' + f.path ? ' on' : ''), title: f.path, onclick: () => { homeTab = 'folder:' + f.path; loadFolderFiles(f.path); renderHome(); } }, h('span', { class: 'hic' }, icon('open')), h('span', { class: 'hlabel', text: f.name })))), 
-    shut ? h('button', { class: 'htab', title: 'New folder', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus'))) : (folders.length ? h('span') : h('button', { class: 'htab', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus')), h('span', { class: 'hlabel', text: 'New folder' }))),
+    shut ? h('button', { class: 'htab', title: 'New folder', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus'))) : (folders.length ? h('span') : h('button', { class: 'htab', onclick: addFolder }, h('span', { class: 'hic' }, icon('folderplus')), h('span', { class: 'hlabel', text: 'New folder' })))] : []),
     h('span', { class: 'grow' }), session ? h('button', { class: 'htab', onclick: closeHome }, h('span', { class: 'hic' }, icon('back')), h('span', { class: 'hlabel', text: 'Back to design' })) : h('span'));
-  const isF = homeTab.startsWith('folder:'), fkey = isF ? homeTab.slice(7) : '', fo = isF ? folders.find((x) => x.path === fkey) : null;
+  const isF = FOLDERS_UI && homeTab.startsWith('folder:'), fkey = isF ? homeTab.slice(7) : '', fo = isF ? folders.find((x) => x.path === fkey) : null;
   const body = homeTab === 'templates' ? homeTemplates() : homeTab === 'settings' ? homeSettings() : isF ? homeFolder(fkey) : homeHome();
   home.append(side, h('div', { class: 'home-main' }, h('div', { class: 'home-in' },
     h('div', { class: 'home-head' }, h('h1', { text: homeTab === 'templates' ? 'Templates' : homeTab === 'settings' ? 'Settings' : isF ? (fo ? fo.name : 'Folder') : 'Home' }), h('span', { class: 'grow' }), homeTab === 'templates' || homeTab === 'settings' ? h('span') : btn('New design', () => newBlank(isF && fo ? { key: fkey, name: fo.name } : null), 'primary')), ...body)));
