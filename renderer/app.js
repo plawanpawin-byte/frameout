@@ -386,7 +386,7 @@ function render() {
   gItems.textContent = ''; gUI.textContent = '';
   for (const i of doc.items) gItems.append(itemEl(i));
   for (const id of sel) {
-    const i = get(id); if (!i) continue; const b = bb(i);
+    const i = get(id); if (!i || i.hidden) continue; const b = bb(i);   // a hidden layer stays selected (layer list) but draws nothing on the canvas
     const ol = sv('rect', { x: b.x, y: b.y, width: b.w, height: b.h, fill: 'none', stroke: '#e6e6e6', 'stroke-width': 1.2 / zoom, 'pointer-events': 'none' }); if (i.rot && i.type !== 'frame') ol.setAttribute('transform', `rotate(${i.rot} ${i.x + i.w / 2} ${i.y + i.h / 2})`); gUI.append(ol);
   }
   if (mode === 'dev') {
@@ -395,7 +395,7 @@ function render() {
   }
   if (sel.size === 1 && mode !== 'dev') {
     const i = get([...sel][0]);
-    if (i && !i.locked && !(i.rot && i.type !== 'frame')) {
+    if (i && !i.locked && !i.hidden && !(i.rot && i.type !== 'frame')) {
       const pts = i.type === 'line' ? { a: [i.x, i.y], b: [i.x + i.w, i.y + i.h] } : { nw: [i.x, i.y], n: [i.x + i.w / 2, i.y], ne: [i.x + i.w, i.y], e: [i.x + i.w, i.y + i.h / 2], se: [i.x + i.w, i.y + i.h], s: [i.x + i.w / 2, i.y + i.h], sw: [i.x, i.y + i.h], w: [i.x, i.y + i.h / 2] };
       const cur = { nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw', n: 'ns', s: 'ns', e: 'ew', w: 'ew', a: 'move', b: 'move' };
       for (const [k, [px, py]] of Object.entries(pts)) { const r = sv('rect', { x: px - 4 / zoom, y: py - 4 / zoom, width: 8 / zoom, height: 8 / zoom, fill: '#ffffff', stroke: '#222', 'stroke-width': 1 / zoom, style: `cursor:${cur[k]}${cur[k].length < 5 ? '-resize' : ''}` }); r.dataset.handle = k; gUI.append(r); }
