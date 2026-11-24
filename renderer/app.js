@@ -94,6 +94,9 @@ const directKids = (f) => doc.items.filter((c) => c !== f && !c.hidden && inside
 // the item plus, for frames, everything inside (that is what moving, copying and deleting a frame mean)
 function expand(ids) { const out = new Set(ids); for (const id of ids) { const f = get(id); if (f && f.type === 'frame') for (const c of descOf(f)) out.add(c.id); } return out; }
 function detach(rootId) { for (const c of doc.items) { if (c.id === rootId) delete c.inst; if (c.instRoot === rootId) { delete c.instOf; delete c.instRoot; delete c.ov; } } }
+const PART_MSG = 'Parts of an instance stay where the component puts them. Move the whole instance, or detach it to change this part.';
+let partToast = 0;
+const partAt = new Map();   // where each instance part was last put (not saved): a part found elsewhere was edited by hand
 const COPY = ['w', 'h', 'fill', 'stroke', 'sw', 'r', 'op', 'fs', 'fill2', 'ga', 'ff', 'fw', 'ta'];
 function syncInstances() {
   for (const root of doc.items.filter((i) => i.inst)) {
@@ -107,8 +110,12 @@ function syncInstances() {
     doc.items = doc.items.filter((c) => c.instRoot !== root.id);
     for (const mc of mk) {
       const o = keep[mc.id] || { ...JSON.parse(JSON.stringify(mc)), id: uid(), name: mc.name };
+      const nx = root.x + (mc.x - m.x), ny = root.y + (mc.y - m.y);
+      // an edit tried to move or resize the part itself (arrow keys, X/Y/W/H, align): it goes back, and say why once
+      const was = partAt.get(o.id);
+      if (restEdit && keep[mc.id] && was && (o.x !== was[0] || o.y !== was[1] || o.w !== was[2] || o.h !== was[3]) && Date.now() - partToast > 2500) { partToast = Date.now(); toast(PART_MSG); }
       for (const k of COPY) o[k] = mc[k]; if (!o.ov) o.text = mc.text; o.type = mc.type; o.name = mc.name;
-      o.x = root.x + (mc.x - m.x); o.y = root.y + (mc.y - m.y); o.instOf = mc.id; o.instRoot = root.id; delete o.master; delete o.inst;
+      o.x = nx; o.y = ny; partAt.set(o.id, [o.x, o.y, o.w, o.h]); o.instOf = mc.id; o.instRoot = root.id; delete o.master; delete o.inst;
       doc.items.push(o);
     }
   }
@@ -151,6 +158,8 @@ function tbtn(label, ic, fn, cls = '', tip = label) {
   const b = h('button', { class: 'btn ' + cls, onclick: fn, title: tip, 'aria-label': label });
   const i = icon(ic, 20); i.classList.add('ic'); i.dataset.for = label; b.append(i, document.createTextNode(label)); return b;
 }
+// a small button inside a clickable card: Enter/Space press the button, not the card; Esc and shortcuts still reach the page
+const stopPress = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); };
 const titleInput = h('input', { type: 'text', class: 'tbtitle', maxlength: 80, title: 'Design name', 'aria-label': 'Design name', placeholder: 'Untitled design', onfocus: () => { titleOld = doc.title || ''; }, onblur: () => { titleOld = null; }, oninput: (e) => { if (titleOld === null) titleOld = doc.title || ''; doc.title = e.target.value; syncTitle(); }, onchange: (e) => { if (!e.target.value.trim()) { doc.title = 'Untitled design'; e.target.value = doc.title; syncTitle(); } }, onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { doc.title = titleOld || doc.title; e.target.value = doc.title; syncTitle(); e.target.blur(); } } });
 let titleOld = null;   // the title before the current edit in the top bar, for Escape
 function syncTitle() { const r = document.querySelector('.rtitle'); if (r && r !== document.activeElement) r.value = doc.title; }
@@ -255,6 +264,8 @@ function openFly(g, anchor) {
   stage.append(fly); flyAnchor = anchor.querySelector('.dkc') || anchor;
 }
 document.addEventListener('pointerdown', (e) => { if (fly && !fly.contains(e.target) && !e.target.closest('.dkc,[data-menu]')) closeFly(); }, true);
+// focus leaving an open menu (Tab, Shift+Tab, a click elsewhere) closes it, so it never stays open behind the focus
+document.addEventListener('focusin', (e) => { if (fly && !fly.contains(e.target) && !e.target.closest('.dkc,[data-menu]')) closeFly(); });
 function toolGroup(g, skip) {
   const list = GROUPS[g].filter((t) => !(skip || []).includes(t[0])), box = h('div', { class: 'dgt' });
   const main = h('button', { class: 'dk', onclick: () => setTool(grpCur[g]) });
@@ -379,7 +390,7 @@ function render() {
   gItems.textContent = ''; gUI.textContent = '';
   for (const i of doc.items) gItems.append(itemEl(i));
   for (const id of sel) {
-    const i = get(id); if (!i) continue; const b = bb(i);
+    const i = get(id); if (!i || i.hidden) continue; const b = bb(i);   // a hidden layer stays selected (layer list) but draws nothing on the canvas
     const ol = sv('rect', { x: b.x, y: b.y, width: b.w, height: b.h, fill: 'none', stroke: '#e6e6e6', 'stroke-width': 1.2 / zoom, 'pointer-events': 'none' }); if (i.rot && i.type !== 'frame') ol.setAttribute('transform', `rotate(${i.rot} ${i.x + i.w / 2} ${i.y + i.h / 2})`); gUI.append(ol);
   }
   if (mode === 'dev') {
@@ -388,7 +399,7 @@ function render() {
   }
   if (sel.size === 1 && mode !== 'dev') {
     const i = get([...sel][0]);
-    if (i && !i.locked && !(i.rot && i.type !== 'frame')) {
+    if (i && !i.locked && !i.hidden && !(i.rot && i.type !== 'frame')) {
       const pts = i.type === 'line' ? { a: [i.x, i.y], b: [i.x + i.w, i.y + i.h] } : { nw: [i.x, i.y], n: [i.x + i.w / 2, i.y], ne: [i.x + i.w, i.y], e: [i.x + i.w, i.y + i.h / 2], se: [i.x + i.w, i.y + i.h], s: [i.x + i.w / 2, i.y + i.h], sw: [i.x, i.y + i.h], w: [i.x, i.y + i.h / 2] };
       const cur = { nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw', n: 'ns', s: 'ns', e: 'ew', w: 'ew', a: 'move', b: 'move' };
       for (const [k, [px, py]] of Object.entries(pts)) { const r = sv('rect', { x: px - 4 / zoom, y: py - 4 / zoom, width: 8 / zoom, height: 8 / zoom, fill: '#ffffff', stroke: '#222', 'stroke-width': 1 / zoom, style: `cursor:${cur[k]}${cur[k].length < 5 ? '-resize' : ''}` }); r.dataset.handle = k; gUI.append(r); }
@@ -746,6 +757,7 @@ svg.addEventListener('pointerdown', (ev) => {
   if (tool === 'pen') { penAdd(p); return; }
   if (tool === 'pencil') { const redo0 = redoS; commit(); const it = makeItem('path', p.x, p.y, 1, 1); it.sm = true; it.pts = [[0, 0]]; doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'pencil', it, abs: [[p.x, p.y]], redo0 }; render(); return; }
   const hd = mode === 'dev' ? null : ev.target.dataset.handle;
+  if (hd && get([...sel][0]) && get([...sel][0]).instOf) { toast(PART_MSG); return; }
   if (hd) { const i = get([...sel][0]); const redo0 = redoS; commit(); drag = { mode: 'resize', hd, i, o: { ...i }, p, redo0 }; return; }
   if (tool !== 'select' && mode !== 'dev') { const redo0 = redoS; commit(); const ty = tool === 'arrow' ? 'line' : tool; const it = makeItem(ty, p.x, p.y, 1, 1); if (tool === 'arrow') { it.ah = true; it.name = 'Arrow ' + (doc.items.filter((x) => x.type === 'line' && x.ah).length + 1); } if (tool === 'text') { it.w = 80; } doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'draw', i: it, p, tool: ty, redo0 }; render(); return; }
   const node = ev.target.closest('[data-id]');
@@ -756,12 +768,17 @@ svg.addEventListener('pointerdown', (ev) => {
     const child = [...doc.items].reverse().find((c) => c !== it && c.type !== 'frame' && !c.hidden && !c.locked && p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h);
     if (child) it = child;
   }
+  // a part of a component instance follows its component: a click on it picks the whole instance (pick the part in the layer list)
+  if (it && it.instOf && !sel.has(it.id)) { const r = get(it.instRoot); if (r && !r.locked) it = r; }
   if (it && mode === 'dev') { sel = new Set([it.id]); render(); return; }
   if (mode === 'dev') { sel.clear(); render(); return; }
   if (it) {
     if (ev.shiftKey) { sel.has(it.id) ? sel.delete(it.id) : sel.add(it.id); } else if (!sel.has(it.id)) sel = new Set([it.id]);
     const moving = [];
     for (const id2 of sel) { const m = get(id2); if (!m || m.locked) continue; moving.push(m); if (m.type === 'frame') doc.items.filter((c) => inside(c, m) && !sel.has(c.id)).forEach((c) => moving.push(c)); }
+    const roots = new Set(moving.map((m) => m.id)), free = moving.filter((m) => !m.instOf || roots.has(m.instRoot));
+    if (!free.length && moving.length) { toast(PART_MSG); render(); return; } // only parts of instances: they stay where their component puts them
+    moving.length = 0; moving.push(...free);
     if (!moving.length) { render(); return; } // only locked layers: select them, nothing to move
     const redo0 = redoS; commit(); drag = { mode: 'move', p, orig: [...new Set(moving)].map((m) => ({ m, x: m.x, y: m.y })), moved: false, redo0 }; render();
   } else { if (!ev.shiftKey) sel.clear(); const r = sv('rect', { fill: 'rgba(200,200,200,.12)', stroke: '#bdbdbd', 'stroke-dasharray': '4 3', 'stroke-width': 1 / zoom }); drag = { mode: 'marquee', p, r }; render(); gUI.append(r); }
@@ -839,6 +856,7 @@ document.addEventListener('keydown', (e) => {
   if (preview) { if (e.key === 'Escape') endPreview(); else if (e.key === 'Backspace' || e.key === 'ArrowLeft') previewBack(); return; }
   if (fly && !document.querySelector('.modal-back')) { // open menu: Esc closes it and gives focus back, arrows move between items
     if (e.key === 'Escape') { e.preventDefault(); closeFly(true); return; }
+    if (e.key === 'Tab') { setTimeout(() => { if (fly && !fly.contains(document.activeElement)) closeFly(); }); return; } // Tab moves on as usual and the menu closes behind it
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && fly.contains(e.target)) { e.preventDefault(); fly.classList.add('kb'); const it = [...fly.querySelectorAll('.fi')], i = it.indexOf(e.target); it[(i + (e.key === 'ArrowDown' ? 1 : it.length - 1)) % it.length].focus(); return; }
     return; // any other key belongs to the menu: Tab, Enter and Space keep their normal job, shortcuts wait until it closes
   }
@@ -1006,7 +1024,9 @@ function openRecent(e) {
   try { const d = JSON.parse(e.doc); if (!Array.isArray(d.items)) throw new Error('damaged'); startDesign({ id: e.id, title: String(d.title || e.title || 'Untitled design'), items: d.items.map(cleanItem), motion: cleanMotion(d.motion) }); }
   catch (err) { toast('Cannot open this design'); }
 }
-function removeRecent(id) { writeRecent(readRecent().filter((e) => e.id !== id)); const s = readStars(); if (s.delete(id)) writeStars(s); renderHome(); }
+// taking the open design out of Recent sticks until it is edited again: autosave sees nothing new to keep
+function forgetOpen() { if (session && doc.items.length) lastSaved = JSON.stringify(restDoc()); }
+function removeRecent(id) { writeRecent(readRecent().filter((e) => e.id !== id)); if (id === doc.id) forgetOpen(); const s = readStars(); if (s.delete(id)) writeStars(s); renderHome(); }
 function ago(t) { const d = new Date(t), now = new Date(); const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); const diff = Math.round((day(now) - day(d)) / 86400000); const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); return diff <= 0 ? 'Today ' + hm : diff === 1 ? 'Yesterday ' + hm : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); }
 function thumbBox(svgStr, cls = '') { const box = h('div', { class: 'thumb ' + cls }); if (svgStr) box.append(h('img', { src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr), alt: '' })); else box.append(h('span', { class: 'muted', text: 'Empty' })); return box; }
 // starter templates, built in code so they stay small and work offline
@@ -1045,8 +1065,8 @@ function recentGrid(list) {
     grid.append(h('div', { class: 'hcard', tabindex: 0, role: 'button', 'aria-label': 'Open ' + name, onclick: () => openRecent(e), onkeydown: (ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) openRecent(e); } },
       thumbBox(e.svg), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: 'Edited ' + ago(e.time) }),
       h('div', { class: 'hacts' },
-        h('button', { class: 'hib hstar' + (on ? ' on' : ''), title: on ? 'Remove star' : 'Star', 'aria-label': on ? 'Remove star' : 'Star', 'aria-pressed': on ? 'true' : 'false', onclick: (ev) => { ev.stopPropagation(); toggleStar(e.id); }, onkeydown: (ev) => ev.stopPropagation() }, icon(on ? 'starfill' : 'star', 20)),
-        h('button', { class: 'hib hrm', title: 'Remove from recent', 'aria-label': 'Remove from recent', onclick: (ev) => { ev.stopPropagation(); removeRecent(e.id); }, onkeydown: (ev) => ev.stopPropagation() }, icon('del', 20)))));
+        h('button', { class: 'hib hstar' + (on ? ' on' : ''), title: on ? 'Remove star' : 'Star', 'aria-label': on ? 'Remove star' : 'Star', 'aria-pressed': on ? 'true' : 'false', onclick: (ev) => { ev.stopPropagation(); toggleStar(e.id); }, onkeydown: stopPress }, icon(on ? 'starfill' : 'star', 20)),
+        h('button', { class: 'hib hrm', title: 'Remove from recent', 'aria-label': 'Remove from recent', onclick: (ev) => { ev.stopPropagation(); removeRecent(e.id); }, onkeydown: stopPress }, icon('del', 20)))));
   }
   return grid;
 }
@@ -1089,7 +1109,7 @@ function homeTemplates() {
   const grid = h('div', { class: 'home-grid' });
   for (const [name, sub, make] of TEMPLATES) grid.append(h('button', { class: 'hcard', onclick: () => startDesign(make()) }, thumbBox(docThumb(make())), h('div', { class: 'hname', text: name }), h('div', { class: 'hsub', text: sub })));
   if (folderView.key !== 'templates') loadFolderFiles('templates');
-  const mine = h('div', { class: 'home-grid' }, folderView.key === 'templates' ? folderView.files.map((f) => fileCard(f, () => startDesign({ id: uid(), title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })), motion: f.doc.motion ? JSON.parse(JSON.stringify(f.doc.motion)) : undefined }), h('div', { class: 'hacts' }, h('button', { class: 'hib hrm', title: 'Remove template', 'aria-label': 'Remove template', onkeydown: (ev) => ev.stopPropagation(), onclick: async (ev) => { ev.stopPropagation(); if (confirm('Remove this template? Your original project file is not touched.')) { try { await window.host.folders.del('templates', f.name); } catch (e) { toast('Could not remove it'); } loadFolderFiles('templates'); } } }, icon('del', 20))))) : []);
+  const mine = h('div', { class: 'home-grid' }, folderView.key === 'templates' ? folderView.files.map((f) => fileCard(f, () => startDesign({ id: uid(), title: f.doc.title, items: f.doc.items.map((i) => ({ ...i })), motion: f.doc.motion ? JSON.parse(JSON.stringify(f.doc.motion)) : undefined }), h('div', { class: 'hacts' }, h('button', { class: 'hib hrm', title: 'Remove template', 'aria-label': 'Remove template', onkeydown: stopPress, onclick: async (ev) => { ev.stopPropagation(); if (confirm('Remove this template? Your original project file is not touched.')) { try { await window.host.folders.del('templates', f.name); } catch (e) { toast('Could not remove it'); } loadFolderFiles('templates'); } } }, icon('del', 20))))) : []);
   return [h('div', { class: 'muted', style: 'margin:-6px 2px 12px', text: 'Start from a ready layout. Everything in it can be edited.' }), grid,
     h('div', { class: 'frow', style: 'margin-top:26px' }, h('h2', { style: 'margin:0', text: 'My templates' }), h('span', { class: 'grow' }), btn('Add your project', () => importInto('templates'), 'primary')),
     h('div', { class: 'muted', style: 'margin:6px 2px 12px', text: 'Upload a .frameout file and it becomes a template you can start new designs from. A copy is kept inside Frameout.' }),
@@ -1103,7 +1123,7 @@ function homeSettings() {
   return [h('div', { class: 'settings' },
     row('When Frameout opens', 'Show this home screen, or jump back into the design you edited last.', pick([['home', 'Home'], ['last', 'Last design']], getSet('openOn'), (v) => putSet('openOn', v))),
     row('Recent designs to keep', 'More designs use more space on this computer. Older ones drop off first. Starred designs are always kept.', pick([[6, '6'], [12, '12'], [24, '24']], getSet('recentMax'), (v) => { putSet('recentMax', v); writeRecent(keepRecent(readRecent(), v)); })),
-    row('Space used by Recent', mb + ' on this computer. Saved .frameout files are not affected.', btn('Clear recent', () => { if (!readRecent().length) return; if (confirm('Remove all designs from Recent, starred ones too? Files you saved are not touched.')) { writeRecent([]); writeStars(new Set()); renderHome(); toast('Recent cleared'); } })),
+    row('Space used by Recent', mb + ' on this computer. Saved .frameout files are not affected.', btn('Clear recent', () => { if (!readRecent().length) return; if (confirm('Remove all designs from Recent, starred ones too? Files you saved are not touched.')) { writeRecent([]); forgetOpen(); writeStars(new Set()); renderHome(); toast('Recent cleared'); } })),
     row('Privacy', 'Frameout never connects to the internet. Your designs stay on this computer.', h('span')),
     row('About', 'Frameout, part of the Lookout apps. Works fully offline.', h('span')))];
 }
