@@ -18,5 +18,7 @@ contextBridge.exposeInMainWorld('host', {
     open: (k) => ipcRenderer.invoke('folders:open', k),
   },
   info: () => ipcRenderer.invoke('app:info'),
+  // before the close question: true when the unsaved changes could not be kept in Recent (sync so it arrives first)
+  closeNote: (lost) => ipcRenderer.sendSync('close:note', !!lost),
   
 });
