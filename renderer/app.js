@@ -94,6 +94,9 @@ const directKids = (f) => doc.items.filter((c) => c !== f && !c.hidden && inside
 // the item plus, for frames, everything inside (that is what moving, copying and deleting a frame mean)
 function expand(ids) { const out = new Set(ids); for (const id of ids) { const f = get(id); if (f && f.type === 'frame') for (const c of descOf(f)) out.add(c.id); } return out; }
 function detach(rootId) { for (const c of doc.items) { if (c.id === rootId) delete c.inst; if (c.instRoot === rootId) { delete c.instOf; delete c.instRoot; delete c.ov; } } }
+const PART_MSG = 'Parts of an instance stay where the component puts them. Move the whole instance, or detach it to change this part.';
+let partToast = 0;
+const partAt = new Map();   // where each instance part was last put (not saved): a part found elsewhere was edited by hand
 const COPY = ['w', 'h', 'fill', 'stroke', 'sw', 'r', 'op', 'fs', 'fill2', 'ga', 'ff', 'fw', 'ta'];
 function syncInstances() {
   for (const root of doc.items.filter((i) => i.inst)) {
@@ -107,8 +110,12 @@ function syncInstances() {
     doc.items = doc.items.filter((c) => c.instRoot !== root.id);
     for (const mc of mk) {
       const o = keep[mc.id] || { ...JSON.parse(JSON.stringify(mc)), id: uid(), name: mc.name };
+      const nx = root.x + (mc.x - m.x), ny = root.y + (mc.y - m.y);
+      // an edit tried to move or resize the part itself (arrow keys, X/Y/W/H, align): it goes back, and say why once
+      const was = partAt.get(o.id);
+      if (restEdit && keep[mc.id] && was && (o.x !== was[0] || o.y !== was[1] || o.w !== was[2] || o.h !== was[3]) && Date.now() - partToast > 2500) { partToast = Date.now(); toast(PART_MSG); }
       for (const k of COPY) o[k] = mc[k]; if (!o.ov) o.text = mc.text; o.type = mc.type; o.name = mc.name;
-      o.x = root.x + (mc.x - m.x); o.y = root.y + (mc.y - m.y); o.instOf = mc.id; o.instRoot = root.id; delete o.master; delete o.inst;
+      o.x = nx; o.y = ny; partAt.set(o.id, [o.x, o.y, o.w, o.h]); o.instOf = mc.id; o.instRoot = root.id; delete o.master; delete o.inst;
       doc.items.push(o);
     }
   }
@@ -746,6 +753,7 @@ svg.addEventListener('pointerdown', (ev) => {
   if (tool === 'pen') { penAdd(p); return; }
   if (tool === 'pencil') { const redo0 = redoS; commit(); const it = makeItem('path', p.x, p.y, 1, 1); it.sm = true; it.pts = [[0, 0]]; doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'pencil', it, abs: [[p.x, p.y]], redo0 }; render(); return; }
   const hd = mode === 'dev' ? null : ev.target.dataset.handle;
+  if (hd && get([...sel][0]) && get([...sel][0]).instOf) { toast(PART_MSG); return; }
   if (hd) { const i = get([...sel][0]); const redo0 = redoS; commit(); drag = { mode: 'resize', hd, i, o: { ...i }, p, redo0 }; return; }
   if (tool !== 'select' && mode !== 'dev') { const redo0 = redoS; commit(); const ty = tool === 'arrow' ? 'line' : tool; const it = makeItem(ty, p.x, p.y, 1, 1); if (tool === 'arrow') { it.ah = true; it.name = 'Arrow ' + (doc.items.filter((x) => x.type === 'line' && x.ah).length + 1); } if (tool === 'text') { it.w = 80; } doc.items.push(it); sel = new Set([it.id]); drag = { mode: 'draw', i: it, p, tool: ty, redo0 }; render(); return; }
   const node = ev.target.closest('[data-id]');
@@ -756,12 +764,17 @@ svg.addEventListener('pointerdown', (ev) => {
     const child = [...doc.items].reverse().find((c) => c !== it && c.type !== 'frame' && !c.hidden && !c.locked && p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h);
     if (child) it = child;
   }
+  // a part of a component instance follows its component: a click on it picks the whole instance (pick the part in the layer list)
+  if (it && it.instOf && !sel.has(it.id)) { const r = get(it.instRoot); if (r && !r.locked) it = r; }
   if (it && mode === 'dev') { sel = new Set([it.id]); render(); return; }
   if (mode === 'dev') { sel.clear(); render(); return; }
   if (it) {
     if (ev.shiftKey) { sel.has(it.id) ? sel.delete(it.id) : sel.add(it.id); } else if (!sel.has(it.id)) sel = new Set([it.id]);
     const moving = [];
     for (const id2 of sel) { const m = get(id2); if (!m || m.locked) continue; moving.push(m); if (m.type === 'frame') doc.items.filter((c) => inside(c, m) && !sel.has(c.id)).forEach((c) => moving.push(c)); }
+    const roots = new Set(moving.map((m) => m.id)), free = moving.filter((m) => !m.instOf || roots.has(m.instRoot));
+    if (!free.length && moving.length) { toast(PART_MSG); render(); return; } // only parts of instances: they stay where their component puts them
+    moving.length = 0; moving.push(...free);
     if (!moving.length) { render(); return; } // only locked layers: select them, nothing to move
     const redo0 = redoS; commit(); drag = { mode: 'move', p, orig: [...new Set(moving)].map((m) => ({ m, x: m.x, y: m.y })), moved: false, redo0 }; render();
   } else { if (!ev.shiftKey) sel.clear(); const r = sv('rect', { fill: 'rgba(200,200,200,.12)', stroke: '#bdbdbd', 'stroke-dasharray': '4 3', 'stroke-width': 1 / zoom }); drag = { mode: 'marquee', p, r }; render(); gUI.append(r); }
