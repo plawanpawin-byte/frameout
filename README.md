@@ -39,13 +39,9 @@ A bar on the left switches between three tabs. **Home** has Start and Recent. **
 
 ![Home screen](screenshots/06-home.png)
 
-Choose **New design** and pick a size for your first frame: phone, tablet, desktop (PC), Instagram post, portrait or story, YouTube thumbnail, Facebook cover, a blank canvas without a frame, or your own width and height.
+Choose **New design** and you go straight to an empty canvas, zoomed out so there is room all around. There is no question to answer first: name it in the box at the top right, then draw a frame (F). Select a frame and pick a size in the right panel (phone, tablet, desktop, Instagram, YouTube and more). For a ready-made start, use the **Templates** tab.
 
-![New design sizes](screenshots/07-new-design.png)
-
-Below the sizes there is **Or start from a template**: pick one and you land in a ready layout.
-
-![Start from a template](screenshots/10-new-templates.png)
+![Empty canvas](screenshots/14-blank-canvas.png)
 
 ### Templates and Settings
 
@@ -65,6 +61,29 @@ In **Templates**, **My templates** lets you upload your own `.frameout` project.
 
 ![My templates](screenshots/12-my-templates.png)
 
+### Tool menus and the four modes
+
+Like Figma, tools that belong together share one button. The small arrow next to **Move** opens Hand; next to the shapes button it opens Rectangle, Line, Arrow, Ellipse, Polygon, Star and Image; next to the pen it opens Pen and Pencil. The button shows the last one you picked.
+
+![Tool menu](screenshots/15-dock-menu.png)
+
+At the right end of the bar are four mode buttons:
+
+- **Draw** keeps only drawing tools. **Pen**: click to add corners, click the first point (or press Enter, or click the last point again) to finish; clicking the first point closes the shape. **Pencil**: drag to draw freehand. Shapes stay editable vectors: move, resize, change colour, make a path closed or smooth.
+
+  ![Draw mode](screenshots/18-draw.png)
+
+- **Design** is the normal editor (frames, components, auto layout, prototype preview).
+- **Motion** adds a timeline. Select a layer, put the playhead on a time and press **Add keyframe**; move the playhead, change the layer's position, size, rotation or opacity, and add another. Choose easing (linear, ease in, ease out, ease in-out), set the duration, drag the playhead to scrub, and press **Play** (with optional **Loop**). Animations are saved in the file. Layers rest at their time-0 position when you leave Motion mode or save.
+
+  ![Motion mode](screenshots/16-motion.png)
+
+- **Dev** is read-only inspection: click a layer to see its size, position and distances to its frame (also drawn on the canvas), copy ready-made CSS or the layer's SVG, export PNG or SVG, write a note for developers and tick **Ready for dev** (a green dot appears on the layer). The panel also lists every colour used.
+
+  ![Dev mode](screenshots/17-dev.png)
+
+Not in these modes yet: curved (Bézier) pen handles, brushes, boolean shape operations, automatic keyframes, exporting an animation as a video or GIF, version comparison and developer integrations.
+
 ### Pictures, rotation, gradients, shadows and text styles
 
 - **Images:** press the picture button in the bottom bar (or Shift+I) and choose PNG, JPG, WebP or GIF files. They are shrunk to keep the design small and stored inside the `.frameout` file. Pictures can have rounded corners, a shadow and rotation like any other layer.
@@ -81,11 +100,13 @@ Press **Home** in the top bar at any time to come back to this screen. Your desi
 
 ## Try it in 3 steps
 
-1. Press **New design**, pick a size, then draw a rectangle and some text inside the frame.
+1. Press **New design**, draw a frame (F), then a rectangle and some text inside it.
 2. Add a second frame and link a button in the first frame to it.
 3. Press **Preview** and click through your screens, then export one as an image.
 
 ## What is new
+
+**1.0.26:** New design opens an empty, zoomed-out canvas with no size question (sizes are now a preset list in the frame's panel). Tools are grouped in dropdown menus like Figma, with new Arrow, Polygon, Star, Pen and Pencil tools, and four modes at the end of the bar: Draw, Design, Motion (keyframe timeline) and Dev (inspect, CSS, annotations).
 
 **1.0.25:** pictures, rotation, gradients, drop shadows and text styles (font, bold, alignment).
 
@@ -190,7 +211,10 @@ Each frame exports on its own, so one file can hold a whole app.
 
 | Keys | What it does |
 | --- | --- |
-| V / F / R / O / L / T | Move, Frame, Rectangle, Ellipse, Line, Text |
+| V / H / F / R / O / L / T | Move, Hand, Frame, Rectangle, Ellipse, Line, Text |
+| P / Shift + P | Pen, Pencil |
+| Shift + L | Arrow |
+| Shift + I | Add a picture |
 | Shift + click | Select several |
 | Space + drag, or scroll | Pan |
 | Ctrl + mouse wheel | Zoom |
